@@ -1,0 +1,56 @@
+# Автоматична публікація сайту на GitHub Pages.
+# Запускається після кожної зміни в гілці main (наприклад, коли ви завантажили трек
+# або змінили ціну) і за кнопкою «Run workflow» на вкладці Actions.
+name: Публікація сайту
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Збірка
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Встановлення ffmpeg (форма хвилі треків)
+        run: which ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+
+      - name: Збірка сайту
+        run: node --disable-warning=ExperimentalWarning static/build.js
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    name: Публікація
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,15 @@
+{
+  "name": "wave-records",
+  "version": "1.0.0",
+  "description": "Сайт студії звукозапису Wave Records: портфоліо, послуги, бронювання з синхронізацією Google Calendar, адмін-панель",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  }
+}

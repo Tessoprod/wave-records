@@ -1,0 +1,6 @@
+data
+.env
+google-service-account.json
+node_modules
+test
+.git
