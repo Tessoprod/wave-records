@@ -1,5 +1,5 @@
 import { html, raw } from '../html.js';
-import { asset, logoMark } from './layout.js';
+import { asset, logoMark, faviconLinks } from './layout.js';
 import { fmt, dateKey, kyivParts } from '../time.js';
 import { STATUS_LABELS } from '../booking.js';
 import { fmtDur } from './public.js';
@@ -32,13 +32,13 @@ function adminLayout(req, { title, active, body, scripts = [] }) {
   <meta name="robots" content="noindex">
   <meta name="csrf" content="${req.session?.csrf || ''}">
   <title>${title} — адмінка Wave Records</title>
-  <link rel="icon" href="${asset('img/favicon.svg')}" type="image/svg+xml">
+  ${faviconLinks()}
   <link rel="stylesheet" href="${asset('css/admin.css')}">
 </head>
 <body>
   <div class="shell">
     <aside class="side">
-      <a class="side-logo" href="/admin">${logoMark}<span>WAVE</span></a>
+      <a class="side-logo" href="/admin">${logoMark()}</a>
       <nav aria-label="Розділи адмінки">
         <ul>${NAV.map(([href, label]) => html`<li><a href="${href}" ${active === href ? raw('aria-current="page"') : ''}>${label}</a></li>`)}</ul>
       </nav>
@@ -67,12 +67,12 @@ export function loginPage({ next = '/admin', error = '' }) {
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
   <title>Вхід — адмінка Wave Records</title>
-  <link rel="icon" href="${asset('img/favicon.svg')}" type="image/svg+xml">
+  ${faviconLinks()}
   <link rel="stylesheet" href="${asset('css/admin.css')}">
 </head>
 <body class="login-body">
   <form class="login card" method="post" action="/admin/login">
-    <a class="side-logo" href="/">${logoMark}<span>WAVE</span></a>
+    <a class="side-logo" href="/">${logoMark()}</a>
     <h1>Вхід в адмінку</h1>
     ${error ? html`<p class="flash flash-err" role="alert">${error}</p>` : ''}
     <input type="hidden" name="next" value="${next || '/admin'}">

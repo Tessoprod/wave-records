@@ -241,7 +241,7 @@ async function main() {
       },
     });
   }
-  fs.copyFileSync(path.join(ROOT, 'public/img/favicon.svg'), path.join(OUT, 'favicon.svg'));
+  fs.copyFileSync(path.join(ROOT, 'public/img/favicon.ico'), path.join(OUT, 'favicon.ico'));
   fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 
   const urls = ['/', '/services/', '/portfolio/', '/about/', '/book/', '/contacts/', '/privacy-policy/', '/agreement/'];
@@ -250,6 +250,8 @@ async function main() {
   }
   fs.writeFileSync(path.join(OUT, 'robots.txt'), `User-agent: *\nAllow: /\n${BASE_URL ? `Sitemap: ${BASE_URL}/sitemap.xml\n` : ''}`);
 
+  // На Windows файл бази лишається заблокованим, доки вона відкрита — спершу закриваємо її
+  (await import('../src/db.js')).db.close();
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(`\n✅ Сайт зібрано: ${Object.keys(pages).length} сторінок, треків: ${vocal.length + music.length + b2b.length}, фото: ${photos.length}.`);
   console.log(`   Запис: ${booking.url ? (booking.embed ? 'календар Google вбудовано на сторінку' : 'кнопка-посилання на сторінку запису Google') : 'ще не підключено'}.`);

@@ -33,11 +33,11 @@ export const icon = {
   clock: raw('<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'),
 };
 
-/** Логотип: п'ять заокруглених смуг рівня гучності, одна — червона. */
-export const logoMark = raw(`<svg class="logo-mark" viewBox="0 0 30 24" aria-hidden="true">
-  <rect x="0" y="9" width="4" height="6" rx="2"/><rect x="6.5" y="4" width="4" height="16" rx="2"/>
-  <rect x="13" y="0" width="4" height="24" rx="2" class="logo-red"/><rect x="19.5" y="5" width="4" height="14" rx="2"/>
-  <rect x="26" y="9.5" width="4" height="5" rx="2"/></svg>`);
+/** Логотип Wave Records (білий, для темного фону). Файл: public/img/logo.png. */
+export const logoMark = () => raw(`<img class="logo-img" src="${asset('img/logo.png')}" alt="Wave Records" width="587" height="160" decoding="async">`);
+/** Іконки сайту: favicon і значок для домашнього екрана телефона. */
+export const faviconLinks = () => raw(`<link rel="icon" href="${asset('img/favicon.png')}" type="image/png" sizes="96x96">
+  <link rel="apple-touch-icon" href="${asset('img/apple-touch-icon.png')}">`);
 
 export const NAV = [
   ['/', 'Головна'],
@@ -96,7 +96,7 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <meta property="og:locale" content="uk_UA">
   ${base ? html`<meta property="og:url" content="${base + current}"><link rel="canonical" href="${base + current}">` : ''}
   ${ogImage ? html`<meta property="og:image" content="${ogImage}">` : ''}
-  <link rel="icon" href="${asset('img/favicon.svg')}" type="image/svg+xml">
+  ${faviconLinks()}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter+Tight:wght@800;900&family=Inter:wght@400;500;600;700&display=swap">
@@ -109,7 +109,7 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <div class="ambient" aria-hidden="true"><span class="orb orb-red"></span><span class="orb orb-blue"></span></div>
 
   <header class="site-header" data-header>
-    <a class="logo" href="/" aria-label="${s.company} — на головну">${logoMark}<span>WAVE</span><span class="logo-sub">RECORDS</span></a>
+    <a class="logo" href="/" aria-label="${s.company} — на головну">${logoMark()}</a>
     <div class="header-actions">
       <a class="btn btn-red btn-sm header-book" href="/book">Записатися</a>
       <button class="btn btn-glass btn-sm menu-toggle" type="button" aria-expanded="false" aria-controls="site-menu" data-menu-toggle>
@@ -134,7 +134,7 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <footer class="site-footer">
     <div class="container footer-grid">
       <div class="footer-brand">
-        <a class="logo logo-lg" href="/">${logoMark}<span>WAVE</span><span class="logo-sub">RECORDS</span></a>
+        <a class="logo logo-lg" href="/">${logoMark()}</a>
         <p>Студія звукозапису та музичного продакшну у Львові.</p>
       </div>
       <div>

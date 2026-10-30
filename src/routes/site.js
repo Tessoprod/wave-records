@@ -62,7 +62,7 @@ export function registerSite(r) {
   /* ---------- Статичні файли та медіа ---------- */
   r.get('/assets/:a', staticHandler);
   r.get('/assets/:a/:b', staticHandler);
-  r.get('/favicon.ico', (req, res) => serveFile(req, res, path.join(config.root, 'public/img/favicon.svg'), { cache: 'public, max-age=86400' }));
+  r.get('/favicon.ico', (req, res) => serveFile(req, res, path.join(config.root, 'public/img/favicon.ico'), { cache: 'public, max-age=86400' }));
 
   r.get('/media/audio/:file', (req, res) => {
     const file = safeJoin(config.audioDir, req.params.file);
