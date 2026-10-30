@@ -107,7 +107,7 @@ export function layout({ title, description, path: current = '/', body, bodyClas
 <body class="${bodyClass}">
   ${analyticsBody(s)}
   <a class="skip" href="#main">Перейти до вмісту</a>
-  <div class="ambient" aria-hidden="true"><span class="orb orb-red"></span><span class="orb orb-blue"></span></div>
+  <div class="bg" data-bg aria-hidden="true"><div class="bg-dots"></div><canvas></canvas><div class="bg-grain"></div></div>
 
   <header class="site-header glass" data-header>
     <a class="logo" href="/" aria-label="${s.company} — на головну">${logoMark()}</a>
@@ -183,6 +183,7 @@ export function layout({ title, description, path: current = '/', body, bodyClas
     </div>
   </div>
 
+  <script src="${asset('js/bg.js')}" defer></script>
   <script src="${asset('js/site.js')}" defer></script>
   ${scripts.map((src) => html`<script src="${asset(src)}" defer></script>`)}
 </body>

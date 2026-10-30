@@ -315,9 +315,12 @@
 
   function liveLoop() {
     raf = 0;
-    if (!analyser || audio.paused) return;
+    if (!analyser || audio.paused) { window.wrAudioLevel = null; return; }
     analyser.getByteFrequencyData(freq);
     const bins = freq.length * 0.7;
+    // Рівень звуку для фону (bg.js): низькі й середні частоти, від 0 до 1
+    const avg = (from, to) => { let s = 0; for (let i = from; i < to; i++) s += freq[i]; return s / (to - from) / 255; };
+    window.wrAudioLevel = { bass: avg(1, 8), mid: avg(8, 48) };
     for (const m of meters) {
       if (!m.visible) continue;
       const n = m.bars.length;
@@ -333,6 +336,7 @@
   }
 
   function setLive(on) {
+    if (!on) window.wrAudioLevel = null;
     meters.forEach((m) => {
       m.el.classList.toggle('is-live', on && !!analyser);
       if (!on) setIdle(m, true);

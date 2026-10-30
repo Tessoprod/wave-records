@@ -106,14 +106,29 @@ h1, h2, h3, h4 { margin: 0; }
 .sec-sub { color: var(--ink-3); font-size: 17px; }
 .chapter { color: var(--ink-3); font-size: 14px; font-weight: 500; margin-bottom: 20px; }
 
-/* ---------- Атмосферне світло за склом ---------- */
+/* ---------- Фон: звукові хвилі (малює public/js/bg.js) ----------
+   Без canvas або до запуску скрипта видно простий градієнт. */
 
-.ambient { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
-.orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .32; }
-.orb-red { width: 46vmax; height: 46vmax; right: -14vmax; top: -16vmax; background: radial-gradient(circle, var(--red), transparent 68%); animation: drift-a 38s ease-in-out infinite alternate; }
-.orb-blue { width: 52vmax; height: 52vmax; left: -20vmax; bottom: -24vmax; background: radial-gradient(circle, var(--blue), transparent 66%); opacity: .26; animation: drift-b 46s ease-in-out infinite alternate; }
-@keyframes drift-a { to { transform: translate(-8vmax, 10vmax) scale(1.08); } }
-@keyframes drift-b { to { transform: translate(10vmax, -8vmax) scale(.94); } }
+.bg {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
+  background:
+    radial-gradient(90% 60% at 85% 0%, rgba(255, 46, 46, .07), transparent 70%),
+    radial-gradient(80% 60% at 0% 100%, rgba(53, 107, 255, .07), transparent 70%),
+    var(--black);
+}
+.bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.2s var(--ease); }
+.bg.is-ready canvas { opacity: 1; }
+/* Дальній шар: тонка сітка точок, що згасає до країв */
+.bg-dots {
+  position: absolute; left: 0; right: 0; top: -32px; height: calc(100% + 64px);
+  background-image: radial-gradient(circle, rgba(245, 245, 245, .09) 1px, transparent 1.6px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 45%, #000 20%, transparent 100%);
+  mask-image: radial-gradient(ellipse 75% 70% at 50% 45%, #000 20%, transparent 100%);
+  will-change: transform;
+}
+/* Зерно, щоб фон не був пласким (картинку генерує bg.js один раз, без мерехтіння) */
+.bg-grain { position: absolute; inset: 0; opacity: .045; background-size: 140px 140px; mix-blend-mode: overlay; }
 
 /* ---------- Liquid glass ----------
    .glass — спільний клас скла (.btn-glass — його варіант для кнопок).
