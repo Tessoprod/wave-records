@@ -87,7 +87,7 @@ export function homePage({ homeServices, tracks }) {
       <ul class="svc-grid" role="list">
         ${homeServices.map((s) => html`
         <li>
-          <a class="svc-card" href="${s.bookable ? bookHref(s) : '/services'}">
+          <a class="svc-card glass" href="${s.bookable ? bookHref(s) : '/services'}">
             <h3 class="svc-name">${s.home_title || s.name}</h3>
             <p class="svc-price">${s.home_price || s.price_label}</p>
             <span class="svc-go">${s.bookable ? 'Записатися' : 'Детальніше'}${icon.arrow}</span>
@@ -151,7 +151,7 @@ export function servicesPage({ sound, media }) {
       ? html`<a class="btn btn-red btn-sm" href="${bookHref(s)}">Записатися${icon.arrow}</a>`
       : html`<a class="btn btn-glass btn-sm" href="${tg}" rel="noopener">${s.category === 'media' ? c.media_cta : 'Обговорити'}${icon.arrowUp}</a>`;
     return html`
-    <li class="svc-full glass-card">
+    <li class="svc-full glass glass-card">
       <div class="svc-full-top">
         <h3 class="svc-name">${s.name}</h3>
         <p class="svc-price">${s.price_label}</p>
@@ -207,7 +207,7 @@ export function portfolioPage({ vocal, music, b2b }) {
   ${part('music', c.music_title, c.music_sub, music)}
   ${part('b2b', c.b2b_title, c.b2b_sub, b2b)}
   <section class="section">
-    <div class="container cta-band">
+    <div class="container cta-band glass">
       <h2 class="h2">Хочете так само?</h2>
       ${btn('/book', 'Записатися', 'red', icon.arrow, 'data-cta="portfolio_book"')}
     </div>
@@ -265,7 +265,7 @@ export function aboutPage({ photos }) {
       </div>
       <ol class="phil-grid" role="list">
         ${phil.items.map((it, i) => html`
-        <li class="phil-item glass-card">
+        <li class="phil-item glass glass-card">
           <span class="num">${String(i + 1).padStart(2, '0')}</span>
           <h3 class="h3">${it.title}</h3>
           <p>${it.text}</p>
@@ -298,7 +298,7 @@ export function aboutPage({ photos }) {
 
   ${cta.visible ? html`
   <section class="section">
-    <div class="container final-cta">
+    <div class="container final-cta glass">
       ${chapter(cta.label)}
       <h2 class="h1">${cta.title}</h2>
       <p class="page-lead">${cta.text}</p>
@@ -333,7 +333,7 @@ export function bookPage({ services, preselect }) {
   </section>
   <section class="container book-wrap">
     <div class="book-info">
-      <div class="info-card glass-card">
+      <div class="info-card glass glass-card">
         <span class="info-icon">${icon.pin}</span>
         <div>
           <p class="info-title">${info.address}</p>
@@ -341,13 +341,13 @@ export function bookPage({ services, preselect }) {
           <a class="text-link" href="${mapUrl}" rel="noopener" target="_blank">Відкрити на мапі${icon.arrowUp}</a>
         </div>
       </div>
-      <div class="info-card glass-card">
+      <div class="info-card glass glass-card">
         <span class="info-icon">₴</span>
         <p>${info.price_note}</p>
       </div>
     </div>
 
-    <form class="book-form glass-panel" id="book-form" novalidate>
+    <form class="book-form glass glass-panel" id="book-form" novalidate>
       <noscript><p class="form-error">Для бронювання увімкніть JavaScript або зателефонуйте: <a href="${telLink(c.phone)}">${c.phone}</a>.</p></noscript>
 
       <fieldset class="bf-step">
@@ -408,7 +408,7 @@ export function bookPage({ services, preselect }) {
     </form>
   </section>
 
-  <dialog class="success glass-panel" id="bf-success" aria-labelledby="bf-success-title">
+  <dialog class="success glass glass-panel" id="bf-success" aria-labelledby="bf-success-title">
     <div class="success-mark" aria-hidden="true"><span></span></div>
     <h2 class="h2" id="bf-success-title" tabindex="-1"></h2>
     <dl class="success-list" id="bf-success-list"></dl>
@@ -469,7 +469,7 @@ export function staticBookPage({ booking }) {
   </section>
   <section class="container book-wrap">
     <div class="book-info">
-      <div class="info-card glass-card">
+      <div class="info-card glass glass-card">
         <span class="info-icon">${icon.pin}</span>
         <div>
           <p class="info-title">${info.address}</p>
@@ -477,12 +477,12 @@ export function staticBookPage({ booking }) {
           <a class="text-link" href="${mapUrl}" rel="noopener" target="_blank">Відкрити на мапі${icon.arrowUp}</a>
         </div>
       </div>
-      <div class="info-card glass-card">
+      <div class="info-card glass glass-card">
         <span class="info-icon">₴</span>
         <p>${info.price_note}</p>
       </div>
     </div>
-    <div class="book-embed glass-panel">
+    <div class="book-embed glass glass-panel">
       ${calendar}
     </div>
     ${booking.url ? html`<div class="book-help"><p class="muted">Не знайшли зручний час або є питання?</p>${contactsRow}</div>` : ''}
@@ -500,7 +500,7 @@ export function contactsPage() {
     <h1 class="h1">${c.title}</h1>
   </section>
   <section class="container bento">
-    <article class="bento-card bento-studio">
+    <article class="glass bento-card bento-studio">
       <p class="bento-label">Студія</p>
       <p class="bento-big">${c.studio}</p>
       <p class="bento-text">${c.address}<br>${c.city}</p>
@@ -509,20 +509,20 @@ export function contactsPage() {
         <a class="btn btn-red btn-sm" href="/book">Записатися${icon.arrow}</a>
       </div>
     </article>
-    <a class="bento-card bento-link" href="${telLink(c.phone)}">
+    <a class="glass bento-card bento-link" href="${telLink(c.phone)}">
       <p class="bento-label">${icon.phone}Телефон</p>
       <p class="bento-value">${c.phone}</p>
     </a>
-    <a class="bento-card bento-link" href="mailto:${c.email}">
+    <a class="glass bento-card bento-link" href="mailto:${c.email}">
       <p class="bento-label">${icon.mail}Email</p>
       <p class="bento-value">${c.email}</p>
     </a>
-    <article class="bento-card">
+    <article class="glass bento-card">
       <p class="bento-label">${icon.clock}Графік</p>
       <p class="bento-value">${c.schedule_days}<br>${c.schedule_hours}</p>
     </article>
     ${c.telegram ? html`
-    <a class="bento-card bento-link bento-tg" href="https://t.me/${c.telegram}" rel="noopener">
+    <a class="glass bento-card bento-link bento-tg" href="https://t.me/${c.telegram}" rel="noopener">
       <p class="bento-label">${icon.telegram}Telegram</p>
       <p class="bento-value">@${c.telegram}</p>
     </a>` : ''}

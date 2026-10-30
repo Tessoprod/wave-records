@@ -10,6 +10,7 @@
 // --height=N — висота екрана, за замовчуванням 900 (для ширини < 800 — 844).
 // --cookies  — не ховати банер cookies.
 // --tag=X    — префікс назви файлу: _shots/X-about-390.png.
+// --hover=S  — навести мишу на перший елемент за CSS-селектором S (стан наведення); з --full не поєднується.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,6 +31,7 @@ const widths = widthsArg.split(',').map(Number).filter(Boolean);
 const full = !!flag('full');
 const fixedHeight = Number((flag('height') || '').split('=')[1]) || 0;
 const tag = (flag('tag') || '').split('=')[1];
+const hover = (flag('hover') || '').split('=').slice(1).join('=');
 const name = page.replace(/^\/|\/$/g, '').replace(/[\/?#=&]+/g, '-') || 'home';
 
 const browser = [
@@ -102,14 +104,31 @@ try {
       awaitPromise: true,
     });
     await sleep(600);
+    if (hover) {
+      const { result: pos } = await send('Runtime.evaluate', {
+        expression: `(() => { const el = document.querySelector(${JSON.stringify(hover)}); if (!el) return null;
+          el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect();
+          return [r.left + r.width * 0.7, r.top + r.height * 0.3]; })()`,
+        returnByValue: true,
+      });
+      if (!pos.value) throw new Error(`немає елемента ${hover}`);
+      await sleep(300);
+      for (const k of [0.4, 0.7, 1]) {
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pos.value[0] * k + (1 - k) * width / 2, y: pos.value[1] });
+        await sleep(60);
+      }
+      await sleep(700);
+    }
     const { result } = await send('Runtime.evaluate', { expression: 'document.documentElement.scrollWidth' });
     const { cssContentSize } = await send('Page.getLayoutMetrics');
     const shotHeight = full ? Math.ceil(cssContentSize.height) : height;
+    const { result: scrolled } = await send('Runtime.evaluate', { expression: 'scrollY' });
+    const shotY = full ? 0 : scrolled.value;
     const { data } = await send('Page.captureScreenshot', {
       format: 'png', captureBeyondViewport: full,
-      clip: { x: 0, y: 0, width, height: shotHeight, scale: 1 },
+      clip: { x: 0, y: shotY, width, height: shotHeight, scale: 1 },
     });
-    const file = path.join(OUT, `${tag ? tag + '-' : ''}${name}-${width}.png`);
+    const file = path.join(OUT, `${tag ? tag + '-' : ''}${name}${hover ? '-hover' : ''}-${width}.png`);
     fs.writeFileSync(file, Buffer.from(data, 'base64'));
     const overflow = result.value > width ? `  ⚠️ сторінка ширша за екран: ${result.value}px` : '';
     console.log(`📸 ${path.relative(ROOT, file)} (${width}×${shotHeight})${overflow}`);

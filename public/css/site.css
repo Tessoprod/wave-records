@@ -29,14 +29,22 @@
   --maxw: 1320px;
   --header-h: 76px;
 
-  --glass-fill: linear-gradient(180deg, rgba(255, 255, 255, .14) 0%, rgba(255, 255, 255, .05) 100%);
-  --glass-edge: rgba(255, 255, 255, .2);
+  /* Рідке скло: одна система для всіх скляних елементів (клас .glass) */
+  --glass-fill: linear-gradient(180deg, rgba(255, 255, 255, .075) 0%, rgba(255, 255, 255, .025) 100%);
+  --glass-fill-hover: linear-gradient(180deg, rgba(255, 255, 255, .11) 0%, rgba(255, 255, 255, .04) 100%);
+  --glass-edge: rgba(255, 255, 255, .16);
+  --glass-edge-hover: rgba(255, 255, 255, .3);
   --glass-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .32),
-    inset 0 -1px 1px rgba(255, 255, 255, .06),
-    inset 0 0 0 .5px rgba(255, 255, 255, .06),
-    0 10px 30px rgba(0, 0, 0, .35);
-  --glass-blur: blur(18px) saturate(180%);
+    inset 0 1px 0 rgba(255, 255, 255, .22),
+    inset 0 -1px 0 rgba(255, 255, 255, .04),
+    0 10px 30px -10px rgba(0, 0, 0, .45);
+  --glass-shadow-hover:
+    inset 0 1px 0 rgba(255, 255, 255, .34),
+    inset 0 -1px 0 rgba(255, 255, 255, .06),
+    0 26px 56px -16px rgba(0, 0, 0, .65);
+  --glass-blur: blur(20px) saturate(175%);
+  --glass-sheen: rgba(255, 255, 255, .055);
+  --glass-rim: rgba(255, 255, 255, 1);
 
   --ease: cubic-bezier(.2, .8, .2, 1);
   --ease-spring: cubic-bezier(.34, 1.4, .64, 1);
@@ -107,28 +115,67 @@ h1, h2, h3, h4 { margin: 0; }
 @keyframes drift-a { to { transform: translate(-8vmax, 10vmax) scale(1.08); } }
 @keyframes drift-b { to { transform: translate(10vmax, -8vmax) scale(.94); } }
 
-/* ---------- Liquid glass ---------- */
+/* ---------- Liquid glass ----------
+   .glass — спільний клас скла (.btn-glass — його варіант для кнопок).
+   ::before — смуга світла всередині скла; зміщується від прокрутки (--sy, для кожного блоку)
+              і положення курсора (--px, на <html>). Обидві змінні оновлює site.js через requestAnimationFrame.
+   ::after  — відблиск по краю скла там, де курсор (--mx/--my); маска лишає тільки рамку.
+   html.lg-refract — Chromium: додаткове заломлення через SVG-фільтр #lg-refract. */
 
-.glass, .btn-glass, .glass-card, .glass-panel {
+.glass, .btn-glass {
   position: relative;
+  isolation: isolate;
+  overflow: hidden;
   background: var(--glass-fill);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-edge);
   box-shadow: var(--glass-shadow);
 }
-/* Відблиск, що йде за курсором (координати --mx/--my ставить site.js) */
-.btn::after, .glass-card::after, .svc-card::after, .bento-link::after, .track-play::after {
+.glass::before, .btn-glass::before {
+  content: '';
+  position: absolute; z-index: -1;
+  top: 0; bottom: 0; left: -60%; width: 220%;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 38%, var(--glass-sheen) 46%, rgba(255, 255, 255, .02) 50%, var(--glass-sheen) 53%, transparent 60%);
+  transform: translate3d(calc((var(--sy, 0) * -18 + var(--px, 0) * 10) * 1%), 0, 0);
+  will-change: transform;
+}
+.glass::after, .btn-glass::after, .btn-red::after, .track-play::after {
   content: '';
   position: absolute; inset: 0;
   border-radius: inherit;
+  padding: 1.5px;
   pointer-events: none;
-  background: radial-gradient(160px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, .22), transparent 65%);
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 0%), var(--glass-rim), rgba(255, 255, 255, .35) 30%, transparent 75%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
   opacity: 0;
   transition: opacity .35s var(--ease);
-  mix-blend-mode: screen;
 }
-.btn:hover::after, .glass-card:hover::after, .svc-card:hover::after, .bento-link:hover::after, .track-play:hover::after { opacity: 1; }
+html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn-glass {
+  -webkit-backdrop-filter: url(#lg-refract) var(--glass-blur);
+  backdrop-filter: url(#lg-refract) var(--glass-blur);
+}
+.lg-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Блоки, що нахиляються до курсора і збільшуються (кути --rx/--ry ставить site.js) */
+.svc-card, .glass-card, .bento-card {
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform .38s var(--ease-spring), box-shadow .38s var(--ease), border-color .38s var(--ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .glass:hover, .btn-glass:hover { border-color: var(--glass-edge-hover); background: var(--glass-fill-hover); }
+  .glass:hover::after, .btn-glass:hover::after, .btn-red:hover::after, .track-play:hover::after { opacity: 1; }
+  .svc-card:hover, .glass-card:hover, .bento-card:hover {
+    transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.025);
+    box-shadow: var(--glass-shadow-hover);
+  }
+}
+@media (hover: none) {
+  .svc-card:active, .glass-card:active, .bento-link:active { transform: scale(.98); transition-duration: .15s; }
+}
 
 /* ---------- Кнопки ---------- */
 
@@ -145,18 +192,23 @@ h1, h2, h3, h4 { margin: 0; }
   white-space: nowrap;
   cursor: pointer;
   isolation: isolate;
-  transition: transform .25s var(--ease-spring), background-color .25s, box-shadow .25s, border-color .25s;
+  transition: transform .35s var(--ease-spring), background-color .25s, box-shadow .3s, border-color .25s;
   -webkit-tap-highlight-color: transparent;
 }
-.btn:active { transform: scale(.965); }
-.btn .i { transition: transform .3s var(--ease); }
-.btn:hover .i { transform: translateX(3px); }
-.btn:hover .i-play { transform: none; }
+.btn .i { transition: transform .35s var(--ease-spring); }
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { transform: translateY(-2px); }
+  .btn:hover .i { transform: translateX(4px); }
+  .btn:hover .i-play { transform: scale(1.12); }
+  .menu-toggle:hover { transform: scale(1.04); }
+}
+.btn:active { transform: scale(.965); transition-duration: .12s; }
 .btn-sm { min-height: 44px; padding: 0 18px 0 20px; font-size: 13px; }
 .btn-lg { min-height: 62px; padding: 0 30px 0 34px; font-size: 16px; }
 .btn-icon { min-height: 48px; width: 48px; padding: 0; }
 .btn-red {
   color: #fff;
+  overflow: hidden;
   background: radial-gradient(130% 160% at 28% 0%, #ff7474 0%, var(--red) 46%, #d61a1a 100%);
   border-color: rgba(255, 170, 170, .5);
   box-shadow:
@@ -165,11 +217,26 @@ h1, h2, h3, h4 { margin: 0; }
     0 12px 32px -6px rgba(255, 46, 46, .55);
 }
 .btn-red:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -3px 8px rgba(120, 0, 0, .25), 0 16px 40px -6px rgba(255, 46, 46, .7); }
-.btn-glass:hover { border-color: rgba(255, 255, 255, .34); background: linear-gradient(180deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .07)); }
 .btn-light { background: var(--white); color: var(--black); box-shadow: inset 0 -2px 4px rgba(0, 0, 0, .12), 0 10px 26px -8px rgba(255, 255, 255, .35); }
 .link-btn { background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; color: inherit; font-size: inherit; }
-.text-link { display: inline-flex; align-items: center; gap: .35em; color: var(--white); font-weight: 600; text-decoration: none; margin-top: 12px; }
+.text-link { display: inline-flex; align-items: center; gap: .35em; color: var(--white); font-weight: 600; text-decoration: none; margin-top: 12px; transition: color .25s; }
 .text-link:hover { color: var(--red); }
+.text-link .i { transition: transform .35s var(--ease-spring); }
+.text-link:hover .i { transform: translateX(4px); }
+
+/* Плавне підкреслення посилань: лінія виростає зліва направо */
+.footer-grid a, .footer-legal a, .footer-legal .link-btn, .menu-meta a, .consent p a {
+  position: relative; display: inline-block; text-decoration: none; transition: color .25s;
+}
+.footer-grid a::after, .footer-legal a::after, .footer-legal .link-btn::after, .menu-meta a::after, .consent p a::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px;
+  background: currentColor; transform: scaleX(0); transform-origin: right;
+  transition: transform .4s var(--ease), opacity .4s var(--ease);
+}
+.consent p a::after { transform: scaleX(1); opacity: .5; }
+.footer-grid a:hover::after, .footer-legal a:hover::after, .footer-legal .link-btn:hover::after, .menu-meta a:hover::after, .consent p a:hover::after {
+  transform: scaleX(1); transform-origin: left; opacity: 1;
+}
 
 /* ---------- Шапка ---------- */
 
@@ -181,23 +248,50 @@ h1, h2, h3, h4 { margin: 0; }
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 10px 0 18px;
   border-radius: var(--r-pill);
-  border: 1px solid rgba(255, 255, 255, .12);
-  background: linear-gradient(180deg, rgba(30, 30, 30, .22), rgba(20, 20, 20, .14));
-  -webkit-backdrop-filter: blur(8px) saturate(140%);
-  backdrop-filter: blur(8px) saturate(140%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
   transition: background .4s var(--ease), border-color .4s var(--ease), box-shadow .4s var(--ease), backdrop-filter .4s var(--ease), -webkit-backdrop-filter .4s var(--ease);
 }
-.site-header[data-scrolled] {
-  background: linear-gradient(180deg, rgba(30, 30, 30, .62), rgba(20, 20, 20, .5));
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border-color: rgba(255, 255, 255, .14);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 12px 30px rgba(0, 0, 0, .4);
+/* На самому верху — легке скло з тонким контуром, при прокрутці — щільніше */
+.site-header.glass:not([data-scrolled]) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .01));
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  backdrop-filter: blur(8px) saturate(140%);
+  border-color: rgba(255, 255, 255, .12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
 }
+.site-header[data-scrolled] {
+  background: linear-gradient(180deg, rgba(30, 30, 30, .5), rgba(20, 20, 20, .38));
+  box-shadow: var(--glass-shadow);
+}
+.site-header:hover::after { opacity: .6; }
 .logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-display); font-size: 20px; letter-spacing: -.01em; line-height: 1; }
+.logo-box { position: relative; display: block; }
 .logo-img { display: block; height: 36px; width: auto; max-width: 100%; }
 .logo-lg .logo-img { height: 64px; }
+/* Логотип, розрізаний на 12 вертикальних смужок: на наведенні вони коротко «грають», як еквалайзер.
+   Кожна смужка — уся картинка, обрізана clip-path (з перекриттям 1px), тож швів між смужками немає. */
+.logo-bars { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.logo-bars i { position: absolute; inset: 0; background: url('../img/logo.png') 0 0 / 100% 100% no-repeat; transform-origin: 50% 60%; }
+.logo-bars i:nth-child(1) { clip-path: inset(0 calc(100% / 12 * 11) 0 0); animation-delay: 0s; }
+.logo-bars i:nth-child(2) { clip-path: inset(0 calc(100% / 12 * 10) 0 calc(100% / 12 * 1 - 1px)); animation-delay: 0.03s; }
+.logo-bars i:nth-child(3) { clip-path: inset(0 calc(100% / 12 * 9) 0 calc(100% / 12 * 2 - 1px)); animation-delay: 0.07s; }
+.logo-bars i:nth-child(4) { clip-path: inset(0 calc(100% / 12 * 8) 0 calc(100% / 12 * 3 - 1px)); animation-delay: 0.02s; }
+.logo-bars i:nth-child(5) { clip-path: inset(0 calc(100% / 12 * 7) 0 calc(100% / 12 * 4 - 1px)); animation-delay: 0.1s; }
+.logo-bars i:nth-child(6) { clip-path: inset(0 calc(100% / 12 * 6) 0 calc(100% / 12 * 5 - 1px)); animation-delay: 0.05s; }
+.logo-bars i:nth-child(7) { clip-path: inset(0 calc(100% / 12 * 5) 0 calc(100% / 12 * 6 - 1px)); animation-delay: 0.12s; }
+.logo-bars i:nth-child(8) { clip-path: inset(0 calc(100% / 12 * 4) 0 calc(100% / 12 * 7 - 1px)); animation-delay: 0.04s; }
+.logo-bars i:nth-child(9) { clip-path: inset(0 calc(100% / 12 * 3) 0 calc(100% / 12 * 8 - 1px)); animation-delay: 0.09s; }
+.logo-bars i:nth-child(10) { clip-path: inset(0 calc(100% / 12 * 2) 0 calc(100% / 12 * 9 - 1px)); animation-delay: 0.01s; }
+.logo-bars i:nth-child(11) { clip-path: inset(0 calc(100% / 12 * 1) 0 calc(100% / 12 * 10 - 1px)); animation-delay: 0.08s; }
+.logo-bars i:nth-child(12) { clip-path: inset(0 0 0 calc(100% / 12 * 11 - 1px)); animation-delay: 0.06s; }
+@keyframes eq { 0%, 100% { transform: scaleY(1); } 25% { transform: scaleY(.62); } 50% { transform: scaleY(1.14); } 75% { transform: scaleY(.86); } }
+/* Поки смужки грають, звичайна картинка схована; після — повертається */
+@keyframes eq-show { 0%, 96% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes eq-hide { 0%, 96% { opacity: 0; } 100% { opacity: 1; } }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .logo:hover .logo-img { animation: eq-hide .85s linear both; }
+  .logo:hover .logo-bars { animation: eq-show .85s linear both; }
+  .logo:hover .logo-bars i { animation-name: eq; animation-duration: .7s; animation-timing-function: var(--ease); animation-fill-mode: both; }
+}
 .header-actions { display: flex; align-items: center; gap: 8px; }
 .menu-toggle { gap: 12px; }
 .burger { position: relative; width: 18px; height: 12px; display: inline-block; }
@@ -211,9 +305,11 @@ h1, h2, h3, h4 { margin: 0; }
 
 .menu {
   position: fixed; inset: 0; z-index: 40;
-  background: rgba(14, 14, 14, .72);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  backdrop-filter: blur(28px) saturate(160%);
+  /* Те саме скло, лише щільніше: меню закриває всю сторінку, текст має читатися */
+  background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015)), rgba(12, 12, 12, .6);
+  -webkit-backdrop-filter: blur(30px) saturate(175%);
+  backdrop-filter: blur(30px) saturate(175%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1);
   overflow-y: auto;
   opacity: 0;
   transition: opacity .35s var(--ease);
@@ -226,7 +322,7 @@ h1, h2, h3, h4 { margin: 0; }
   font-size: clamp(42px, 8.4vw, 104px); line-height: 1.02;
   text-decoration: none;
   transform: translateY(105%);
-  transition: transform .6s var(--ease), color .2s;
+  transition: transform .6s var(--ease), color .25s;
 }
 .menu.is-open .menu-links a { transform: none; }
 .menu-links li:nth-child(2) a { transition-delay: .03s; }
@@ -234,11 +330,12 @@ h1, h2, h3, h4 { margin: 0; }
 .menu-links li:nth-child(4) a { transition-delay: .09s; }
 .menu-links li:nth-child(5) a { transition-delay: .12s; }
 .menu-links li:nth-child(6) a { transition-delay: .15s; }
-.menu-links a:hover { color: var(--red); }
+@media (hover: hover) and (pointer: fine) {
+  .menu.is-open .menu-links a:hover { color: var(--red); transform: translateX(12px); transition-delay: 0s; }
+}
 .menu-links a[aria-current="page"]::after { content: ''; width: .2em; height: .2em; border-radius: 50%; background: var(--red); box-shadow: 0 0 24px var(--red); }
 .menu-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; color: var(--ink-2); font-size: 15px; border-top: 1px solid var(--line); padding-top: 24px; }
-.menu-meta a { text-decoration: none; }
-.menu-meta a:hover { color: var(--white); text-decoration: underline; }
+.menu-meta a:hover { color: var(--white); }
 body.menu-open { overflow: hidden; }
 
 /* ---------- Секції ---------- */
@@ -285,21 +382,14 @@ main { display: block; }
   display: flex; flex-direction: column; gap: 14px;
   padding: 28px;
   border-radius: var(--r-lg);
-  background: linear-gradient(160deg, rgba(48, 48, 48, .55), rgba(28, 28, 28, .55));
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  border: 1px solid var(--line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
   text-decoration: none;
-  transition: border-color .3s, transform .4s var(--ease), background-color .3s;
 }
-.svc-card:hover { border-color: var(--line-2); transform: translateY(-3px); }
 .svc-name { font-size: clamp(20px, 1.8vw, 26px); line-height: 1.02; }
 .svc-price { font-size: clamp(26px, 2.6vw, 38px); font-weight: 700; letter-spacing: -.02em; line-height: 1.1; margin-top: auto; font-variant-numeric: tabular-nums; }
 .svc-go { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); transition: color .2s; }
 .svc-card:hover .svc-go { color: var(--white); }
 .svc-card:hover .svc-go .i { transform: translateX(4px); }
-.svc-go .i { transition: transform .3s var(--ease); }
+.svc-go .i { transition: transform .35s var(--ease-spring); }
 
 /* ---------- Треки ---------- */
 
@@ -324,9 +414,14 @@ main { display: block; }
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-edge);
   box-shadow: var(--glass-shadow);
-  transition: transform .25s var(--ease-spring), background-color .25s;
+  overflow: hidden;
+  transition: transform .35s var(--ease-spring), background-color .25s, border-color .25s;
 }
-.track-play:active { transform: scale(.92); }
+@media (hover: hover) and (pointer: fine) {
+  .track-play:hover { transform: scale(1.07); border-color: var(--glass-edge-hover); }
+  .mini-btn:hover, .mini-close:hover { transform: scale(1.08); }
+}
+.track-play:active { transform: scale(.92); transition-duration: .12s; }
 .track-play .i { width: 24px; height: 24px; }
 .track-play .i-pause, .mini-btn .i-pause { display: none; }
 .is-playing .track-play .i-play, .mini-player.is-playing .mini-btn .i-play { display: none; }
@@ -376,9 +471,11 @@ main { display: block; }
 /* ---------- Портфоліо ---------- */
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 32px; }
-.chip { display: inline-flex; align-items: center; min-height: 40px; padding: 0 18px; border-radius: var(--r-pill); border: 1px solid var(--line-2); text-decoration: none; font-weight: 600; font-size: 14px; transition: background-color .2s, border-color .2s; }
+.chip { display: inline-flex; align-items: center; min-height: 40px; padding: 0 18px; border-radius: var(--r-pill); border: 1px solid var(--line-2); text-decoration: none; font-weight: 600; font-size: 14px; transition: background-color .25s, border-color .25s, transform .35s var(--ease-spring); }
 .chip:hover { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .35); }
-.cta-band { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; padding: clamp(28px, 4vw, 48px); border-radius: var(--r-xl); background: linear-gradient(120deg, rgba(255, 46, 46, .16), rgba(53, 107, 255, .1)); border: 1px solid var(--line); }
+@media (hover: hover) and (pointer: fine) { .chip:hover { transform: translateY(-2px); } }
+.chip:active { transform: scale(.96); }
+.cta-band { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; padding: clamp(28px, 4vw, 48px); border-radius: var(--r-xl); }
 
 /* ---------- Про студію ---------- */
 
@@ -420,7 +517,7 @@ main { display: block; }
 .lightbox img { max-height: 88vh; width: auto; border-radius: var(--r-lg); }
 .lightbox-close { position: absolute; top: -60px; right: 0; }
 
-.final-cta { padding: clamp(36px, 6vw, 80px); border-radius: var(--r-xl); background: radial-gradient(90% 120% at 0% 0%, rgba(255, 46, 46, .22), transparent 60%), radial-gradient(80% 120% at 100% 100%, rgba(53, 107, 255, .2), transparent 60%), var(--surface); border: 1px solid var(--line); }
+.final-cta { padding: clamp(36px, 6vw, 80px); border-radius: var(--r-xl); }
 .final-cta .page-lead { margin: 24px 0 36px; }
 
 /* Графічні фрагменти на місці фото */
@@ -437,16 +534,16 @@ main { display: block; }
 /* ---------- Контакти ---------- */
 
 .bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(190px, auto); gap: 12px; margin-top: clamp(32px, 5vw, 56px); }
-.bento-card { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 28px; border-radius: var(--r-lg); background: linear-gradient(160deg, rgba(48, 48, 48, .55), rgba(26, 26, 26, .6)); border: 1px solid var(--line); text-decoration: none; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-.bento-studio { grid-column: span 2; grid-row: span 2; background: radial-gradient(90% 80% at 0% 0%, rgba(255, 46, 46, .28), transparent 65%), linear-gradient(160deg, rgba(48, 48, 48, .6), rgba(26, 26, 26, .6)); }
+.bento-card { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 28px; border-radius: var(--r-lg); text-decoration: none; }
+.bento-studio { grid-column: span 2; grid-row: span 2; }
 .bento-label { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 14px; font-weight: 500; }
 .bento-big { font-size: clamp(40px, 5.4vw, 80px); line-height: 1.04; margin-top: auto; }
 .bento-text { color: var(--ink-2); font-size: 19px; }
 .bento-value { margin-top: auto; font-size: clamp(18px, 1.55vw, 23px); font-weight: 700; letter-spacing: -.01em; line-height: 1.2; overflow-wrap: anywhere; }
 .bento-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-.bento-link { transition: border-color .3s, transform .4s var(--ease); }
-.bento-link:hover { border-color: var(--line-2); transform: translateY(-3px); }
-.bento-tg { background: radial-gradient(100% 100% at 100% 0%, rgba(53, 107, 255, .4), transparent 70%), linear-gradient(160deg, rgba(48, 48, 48, .55), rgba(26, 26, 26, .6)); }
+/* Ледь помітні фірмові відтінки в склі */
+.bento-studio { background: radial-gradient(80% 70% at 0% 0%, rgba(255, 46, 46, .07), transparent 70%), var(--glass-fill); }
+.bento-tg { background: radial-gradient(90% 90% at 100% 0%, rgba(53, 107, 255, .09), transparent 70%), var(--glass-fill); }
 
 /* ---------- Запис ---------- */
 
@@ -458,7 +555,7 @@ main { display: block; }
 .info-icon { flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 46, 46, .16); color: var(--red); font-weight: 700; font-size: 20px; }
 .info-icon .i { width: 22px; height: 22px; }
 .glass-panel { border-radius: var(--r-xl); }
-.book-form { padding: clamp(22px, 4vw, 48px); display: flex; flex-direction: column; gap: clamp(28px, 4vw, 40px); background: linear-gradient(180deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .03)); }
+.book-form { padding: clamp(22px, 4vw, 48px); display: flex; flex-direction: column; gap: clamp(28px, 4vw, 40px); }
 .bf-step { border: 0; margin: 0; padding: 0; min-width: 0; }
 .bf-step legend { display: flex; align-items: center; gap: 12px; padding: 0; margin-bottom: 18px; font-family: var(--font-display); font-weight: 900; font-synthesis: none; font-size: clamp(22px, 2.2vw, 30px); text-transform: uppercase; line-height: 1; }
 .bf-num { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--red); color: #fff; font-family: var(--font-text); font-weight: 700; font-size: 15px; }
@@ -521,7 +618,7 @@ main { display: block; }
 .form-error { color: #ffb3b3; background: rgba(255, 46, 46, .12); border: 1px solid rgba(255, 46, 46, .4); padding: 14px 18px; border-radius: var(--r-md); }
 #bf-submit[aria-busy="true"] { opacity: .7; pointer-events: none; }
 
-.success { width: min(520px, 100% - 32px); padding: clamp(28px, 5vw, 44px); color: var(--white); background: linear-gradient(180deg, rgba(40, 40, 40, .82), rgba(22, 22, 22, .86)); }
+.success { width: min(520px, 100% - 32px); padding: clamp(28px, 5vw, 44px); color: var(--white); background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02)), rgba(18, 18, 18, .55); }
 .success::backdrop { background: rgba(10, 10, 10, .6); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .success[open] { animation: pop .5s var(--ease-spring); }
 @keyframes pop { from { opacity: 0; transform: scale(.94) translateY(12px); } }
@@ -569,8 +666,7 @@ main { display: block; }
 .footer-grid { display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: 36px; }
 .footer-brand p { margin-top: 16px; max-width: 22em; }
 .footer-h { font-family: var(--font-text); font-size: 13px; font-weight: 600; color: var(--ink-3); margin-bottom: 12px; text-transform: none; }
-.footer-grid a { text-decoration: none; }
-.footer-grid a:hover { color: var(--white); text-decoration: underline; }
+.footer-grid a:hover { color: var(--white); }
 .footer-links { list-style: none; display: grid; gap: 6px; }
 .footer-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 14px; }
 .footer-legal { display: flex; flex-wrap: wrap; gap: 8px 20px; }
@@ -585,11 +681,13 @@ main { display: block; }
   display: grid; grid-template-columns: auto minmax(0, 1fr) 96px auto; align-items: center; gap: 14px;
   padding: 8px 10px 8px 8px;
   border-radius: var(--r-pill);
-  background: linear-gradient(180deg, rgba(48, 48, 48, .66), rgba(24, 24, 24, .62));
+  /* Скло трохи щільніше: плеєр висить над будь-яким вмістом сторінки */
+  background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03)), rgba(16, 16, 16, .45);
   animation: rise .5s var(--ease-spring);
 }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, 24px); } }
-.mini-btn, .mini-close { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; border: 0; cursor: pointer; }
+.mini-btn, .mini-close { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; border: 0; cursor: pointer; transition: transform .35s var(--ease-spring), background-color .25s, color .25s; }
+.mini-btn:active, .mini-close:active { transform: scale(.92); transition-duration: .12s; }
 .mini-btn { background: var(--blue); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4); }
 .mini-btn .i { width: 20px; height: 20px; }
 .mini-close { background: transparent; color: var(--ink-2); }
@@ -601,7 +699,7 @@ main { display: block; }
 
 /* ---------- Cookies ---------- */
 
-.consent { position: fixed; z-index: 60; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: min(440px, 100% - 32px); padding: 20px; border-radius: var(--r-lg); background: linear-gradient(180deg, rgba(48, 48, 48, .72), rgba(24, 24, 24, .7)); font-size: 15px; color: var(--ink-2); }
+.consent { position: fixed; z-index: 60; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: min(440px, 100% - 32px); padding: 20px; border-radius: var(--r-lg); background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03)), rgba(16, 16, 16, .5); font-size: 15px; color: var(--ink-2); }
 .consent a { color: var(--white); }
 .consent-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 
@@ -670,10 +768,16 @@ main { display: block; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   .menu-links a { transform: none; }
+  /* Без нахилів, збільшень і зміщень — лише зміна кольору й прозорості */
+  .btn, .chip, .track-play, .mini-btn, .mini-close, .svc-card, .glass-card, .bento-card,
+  .btn:hover, .btn:active, .chip:hover, .chip:active, .track-play:hover, .track-play:active, .mini-btn:hover, .mini-close:hover,
+  .svc-card:hover, .glass-card:hover, .bento-card:hover, .menu.is-open .menu-links a:hover,
+  .btn .i, .btn:hover .i, .svc-card:hover .svc-go .i, .text-link:hover .i { transform: none !important; }
+  .glass::before, .btn-glass::before { transform: none; }
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass, .btn-glass, .glass-card, .glass-panel, .mini-player, .consent { background: var(--graphite); }
+  .glass, .btn-glass, .mini-player, .consent { background: var(--graphite); }
   .site-header[data-scrolled] { background: rgba(28, 28, 28, .96); }
   .menu { background: rgba(14, 14, 14, .97); }
 }

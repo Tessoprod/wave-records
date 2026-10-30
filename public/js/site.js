@@ -111,19 +111,70 @@
     if (e.key === 'Escape' && toggle?.getAttribute('aria-expanded') === 'true') { setMenu(false); toggle.focus(); }
   });
 
-  /* ---------- Відблиск рідкого скла за курсором ---------- */
+  /* ---------- Рідке скло ----------
+     --px (на <html>)   — положення курсора по горизонталі, від -1 до 1;
+     --sy (на блоці)    — де блок на екрані по вертикалі, від -1 (вгорі) до 1 (внизу);
+     --mx/--my          — курсор усередині блоку (відблиск по краю);
+     --rx/--ry          — нахил блоку до курсора, до 3°.
+     Смуга світла всередині скла зміщується від --px і --sy, тож скло «живе» при прокрутці й русі миші. */
+  const root = document.documentElement;
+  // Заломлення через SVG-фільтр у backdrop-filter уміє лише Chromium; Safari і Firefox лишаються з розмиттям
+  const isChromium = !!navigator.userAgentData?.brands?.some((b) => /Chromium/.test(b.brand));
+  if (isChromium && !reduceMotion && CSS.supports?.('backdrop-filter', 'url(#lg-refract) blur(1px)')) root.classList.add('lg-refract');
+
+  const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const TILT = '.svc-card, .glass-card, .bento-card';
+  const RIM = '.glass, .btn-glass, .btn-red, .track-play';
+  const visibleGlass = new Set();
+  let pointer = null;
+  let hovered = null;
   let glassRaf = 0;
-  document.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse' || glassRaf) return;
-    glassRaf = requestAnimationFrame(() => {
-      glassRaf = 0;
-      const el = e.target.closest?.('.btn, .glass-card, .svc-card, .bento-link, .track-play');
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      el.style.setProperty('--mx', `${e.clientX - r.left}px`);
-      el.style.setProperty('--my', `${e.clientY - r.top}px`);
+
+  function glassFrame() {
+    glassRaf = 0;
+    // Спершу всі виміри, потім усі записи — без зайвих перерахунків верстки
+    const h = innerHeight;
+    const blocks = [...visibleGlass].map((el) => [el, el.getBoundingClientRect()]);
+    let hit = null;
+    if (pointer) {
+      const el = pointer.target.closest?.(RIM);
+      if (el) hit = [el, el.getBoundingClientRect(), el.matches(TILT)];
+    }
+    for (const [el, r] of blocks) el.style.setProperty('--sy', (((r.top + r.height / 2) / h) * 2 - 1).toFixed(3));
+    if (pointer) root.style.setProperty('--px', ((pointer.x / innerWidth) * 2 - 1).toFixed(3));
+    if (hovered && hovered !== hit?.[0]) { hovered.style.removeProperty('--rx'); hovered.style.removeProperty('--ry'); }
+    hovered = hit?.[0] || null;
+    if (hit) {
+      const [el, r, tilt] = hit;
+      const x = pointer.x - r.left;
+      const y = pointer.y - r.top;
+      el.style.setProperty('--mx', `${x.toFixed(1)}px`);
+      el.style.setProperty('--my', `${y.toFixed(1)}px`);
+      if (tilt) {
+        el.style.setProperty('--rx', `${((0.5 - y / r.height) * 6).toFixed(2)}deg`);
+        el.style.setProperty('--ry', `${((x / r.width - 0.5) * 6).toFixed(2)}deg`);
+      }
+    }
+  }
+  const scheduleGlass = () => { if (!glassRaf) glassRaf = requestAnimationFrame(glassFrame); };
+
+  if (!reduceMotion) {
+    const glassIO = 'IntersectionObserver' in window && new IntersectionObserver((entries) => {
+      entries.forEach((en) => (en.isIntersecting ? visibleGlass.add(en.target) : visibleGlass.delete(en.target)));
+      scheduleGlass();
     });
-  }, { passive: true });
+    if (glassIO) $$('.glass, .btn-glass').forEach((el) => glassIO.observe(el));
+    addEventListener('scroll', scheduleGlass, { passive: true });
+    addEventListener('resize', scheduleGlass, { passive: true });
+    if (finePointer) {
+      document.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'mouse') return;
+        pointer = { x: e.clientX, y: e.clientY, target: e.target };
+        scheduleGlass();
+      }, { passive: true });
+      document.addEventListener('pointerleave', () => { pointer = null; scheduleGlass(); }, { passive: true });
+    }
+  }
 
   /* ---------- Лінії рівня (meter) ---------- */
   const meters = $$('.meter[data-live]').map((el) => ({ el, bars: [], idle: [], visible: true }));

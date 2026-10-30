@@ -34,7 +34,8 @@ export const icon = {
 };
 
 /** Логотип Wave Records (білий, для темного фону). Файл: public/img/logo.png. */
-export const logoMark = () => raw(`<img class="logo-img" src="${asset('img/logo.png')}" alt="Wave Records" width="587" height="160" decoding="async">`);
+/** Смужки поверх логотипа: на наведенні вони коротко «грають», як еквалайзер (стилі .logo-bars у site.css). */
+export const logoMark = () => raw(`<span class="logo-box"><img class="logo-img" src="${asset('img/logo.png')}" alt="Wave Records" width="587" height="160" decoding="async"><span class="logo-bars" aria-hidden="true">${'<i></i>'.repeat(12)}</span></span>`);
 /** Іконки сайту: favicon і значок для домашнього екрана телефона. */
 export const faviconLinks = () => raw(`<link rel="icon" href="${asset('img/favicon.png')}" type="image/png" sizes="96x96">
   <link rel="apple-touch-icon" href="${asset('img/apple-touch-icon.png')}">`);
@@ -108,7 +109,7 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <a class="skip" href="#main">Перейти до вмісту</a>
   <div class="ambient" aria-hidden="true"><span class="orb orb-red"></span><span class="orb orb-blue"></span></div>
 
-  <header class="site-header" data-header>
+  <header class="site-header glass" data-header>
     <a class="logo" href="/" aria-label="${s.company} — на головну">${logoMark()}</a>
     <div class="header-actions">
       <a class="btn btn-red btn-sm header-book" href="/book">Записатися</a>
@@ -130,6 +131,15 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   </div>
 
   <main id="main">${body}</main>
+
+  <!-- Заломлення рідкого скла (лише Chromium, вмикає site.js класом lg-refract на <html>) -->
+  <svg class="lg-defs" width="0" height="0" aria-hidden="true" focusable="false">
+    <filter id="lg-refract" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.009" numOctaves="2" seed="11" result="noise"/>
+      <feGaussianBlur in="noise" stdDeviation="3" result="soft"/>
+      <feDisplacementMap in="SourceGraphic" in2="soft" scale="26" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </svg>
 
   <footer class="site-footer">
     <div class="container footer-grid">
