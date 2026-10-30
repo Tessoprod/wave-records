@@ -74,7 +74,7 @@ export function homePage({ homeServices, tracks }) {
         </div>
       </div>
     </div>
-    <div class="hero-meter meter" data-live data-hero aria-hidden="true"></div>
+    <div class="hero-meter" data-hero-wave aria-hidden="true"><canvas></canvas></div>
   </section>` : ''}
 
   ${svc.visible && homeServices.length ? html`

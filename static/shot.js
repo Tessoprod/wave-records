@@ -107,7 +107,7 @@ try {
     if (hover) {
       const { result: pos } = await send('Runtime.evaluate', {
         expression: `(() => { const el = document.querySelector(${JSON.stringify(hover)}); if (!el) return null;
-          el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect();
+          el.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = el.getBoundingClientRect();
           return [r.left + r.width * 0.7, r.top + r.height * 0.3]; })()`,
         returnByValue: true,
       });
