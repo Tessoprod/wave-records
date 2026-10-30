@@ -69,6 +69,26 @@
   addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
+  /* ---------- Перший екран: WAVE RECORDS завжди в ширину контейнера ---------- */
+  const heroTitle = $('.hero-title');
+  const heroLine = $('.hero-l1');
+  function fitHero() {
+    if (!heroTitle || !heroLine) return;
+    heroTitle.style.removeProperty('--hero-fs');
+    const box = heroTitle.parentElement.clientWidth;
+    const width = heroLine.scrollWidth;
+    if (width > box) {
+      const size = parseFloat(getComputedStyle(heroLine).fontSize);
+      heroTitle.style.setProperty('--hero-fs', `${Math.floor(size * box / width * 0.98)}px`);
+    }
+  }
+  if (heroTitle) {
+    fitHero();
+    if (document.fonts) document.fonts.ready.then(fitHero);
+    let fitT;
+    addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(fitHero, 100); });
+  }
+
   const menu = $('[data-menu]');
   const toggle = $('[data-menu-toggle]');
   function setMenu(open) {

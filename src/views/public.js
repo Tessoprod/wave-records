@@ -238,10 +238,27 @@ export function aboutPage({ photos }) {
     </figure>
   </section>` : ''}
 
+  ${atm.visible ? html`
+  <section class="section">
+    <div class="container">
+      ${chapter('02 / Atmosphere')}
+      <header class="sec-head sec-head-stack"><h2 class="h2">${atm.title}</h2>${atm.text ? html`<p class="sec-lead">${atm.text}</p>` : ''}</header>
+      <ul class="gallery" role="list" data-gallery>
+        ${gallery.length
+          ? gallery.map((p, i) => html`<li class="g-item g-${i % 6}"><button type="button" class="g-open" data-full="/media/photos/${p.file}" data-alt="${p.alt}" aria-label="Відкрити фото${p.alt ? `: ${p.alt}` : ''}">${photoImg(p, { sizes: '(min-width: 900px) 33vw, 100vw' })}</button></li>`)
+          : [0, 1, 2, 3].map((i) => html`<li class="g-item g-${i}">${fragment(i, 'Місце для фото студії')}</li>`)}
+      </ul>
+    </div>
+    <dialog class="lightbox" data-lightbox aria-label="Фото студії">
+      <button type="button" class="lightbox-close btn btn-glass btn-icon" data-lightbox-close aria-label="Закрити">${icon.close}</button>
+      <img alt="" data-lightbox-img>
+    </dialog>
+  </section>` : ''}
+
   ${phil.visible ? html`
   <section class="section">
     <div class="container">
-      ${chapter('02 / Philosophy')}
+      ${chapter('03 / Philosophy')}
       <div class="phil-head">
         <h2 class="h2">${phil.title}</h2>
         <p class="sec-lead">${phil.lead}</p>
@@ -260,7 +277,7 @@ export function aboutPage({ photos }) {
   ${proc.visible ? html`
   <section class="section">
     <div class="container">
-      ${chapter('03 / Process')}
+      ${chapter('04 / Process')}
       <header class="sec-head sec-head-stack"><h2 class="h2">${proc.title}</h2><p class="sec-lead">${proc.lead}</p></header>
       <ol class="timeline" role="list">
         ${proc.items.map((it, i) => {
@@ -277,23 +294,6 @@ export function aboutPage({ photos }) {
         })}
       </ol>
     </div>
-  </section>` : ''}
-
-  ${atm.visible ? html`
-  <section class="section">
-    <div class="container">
-      ${chapter('04 / Atmosphere')}
-      <header class="sec-head sec-head-stack"><h2 class="h2">${atm.title}</h2>${atm.text ? html`<p class="sec-lead">${atm.text}</p>` : ''}</header>
-      <ul class="gallery" role="list" data-gallery>
-        ${gallery.length
-          ? gallery.map((p, i) => html`<li class="g-item g-${i % 6}"><button type="button" class="g-open" data-full="/media/photos/${p.file}" data-alt="${p.alt}" aria-label="Відкрити фото${p.alt ? `: ${p.alt}` : ''}">${photoImg(p, { sizes: '(min-width: 900px) 33vw, 100vw' })}</button></li>`)
-          : [0, 1, 2, 3].map((i) => html`<li class="g-item g-${i}">${fragment(i, 'Місце для фото студії')}</li>`)}
-      </ul>
-    </div>
-    <dialog class="lightbox" data-lightbox aria-label="Фото студії">
-      <button type="button" class="lightbox-close btn btn-glass btn-icon" data-lightbox-close aria-label="Закрити">${icon.close}</button>
-      <img alt="" data-lightbox-img>
-    </dialog>
   </section>` : ''}
 
   ${cta.visible ? html`

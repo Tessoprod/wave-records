@@ -1,0 +1,125 @@
+// Скріншоти сайту для перевірки верстки (потрібен запущений перегляд: npm run preview).
+//
+//   node static/shot.js about 1440,1024,390,360 --full
+//   node static/shot.js home 390 --height=844
+// (у Git Bash пишіть назву без скісних рисок — about, а не /about/)
+//
+// Відкриває сторінку в headless Microsoft Edge (або Chrome) з точною шириною екрана
+// (звичайний --window-size у headless не дає вікно вужче ~500 px) і зберігає PNG у _shots/.
+// --full     — уся сторінка від верху до низу (інакше лише перший екран).
+// --height=N — висота екрана, за замовчуванням 900 (для ширини < 800 — 844).
+// --cookies  — не ховати банер cookies.
+// --tag=X    — префікс назви файлу: _shots/X-about-390.png.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const OUT = path.join(ROOT, '_shots');
+const BASE = process.env.PREVIEW_URL || 'http://localhost:4000';
+const PORT = 9333;
+
+const args = process.argv.slice(2);
+const flag = (name) => args.find((a) => a.startsWith(`--${name}`));
+const [pageArg = '/', widthsArg = '1440,1024,390,360'] = args.filter((a) => !a.startsWith('--'));
+// Сторінку можна вказати і без скісних рисок: home, about, services
+const page = pageArg === 'home' ? '/' : pageArg.startsWith('/') ? pageArg : `/${pageArg}/`;
+const widths = widthsArg.split(',').map(Number).filter(Boolean);
+const full = !!flag('full');
+const fixedHeight = Number((flag('height') || '').split('=')[1]) || 0;
+const tag = (flag('tag') || '').split('=')[1];
+const name = page.replace(/^\/|\/$/g, '').replace(/[\/?#=&]+/g, '-') || 'home';
+
+const browser = [
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/microsoft-edge',
+].find((p) => fs.existsSync(p));
+if (!browser) { console.error('Не знайдено Microsoft Edge або Google Chrome.'); process.exit(1); }
+
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'wave-shot-'));
+const proc = spawn(browser, ['--headless=new', '--hide-scrollbars', '--disable-gpu', '--no-first-run',
+  `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function connect() {
+  for (let i = 0; i < 50; i++) {
+    try {
+      const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+      const target = list.find((t) => t.type === 'page');
+      if (target) return target.webSocketDebuggerUrl;
+    } catch { /* браузер ще стартує */ }
+    await sleep(200);
+  }
+  throw new Error('Браузер не відповідає');
+}
+
+let ws;
+let nextId = 1;
+const waiting = new Map();
+const listeners = [];
+function send(method, params = {}) {
+  const id = nextId++;
+  ws.send(JSON.stringify({ id, method, params }));
+  return new Promise((resolve, reject) => waiting.set(id, { resolve, reject }));
+}
+const once = (method) => new Promise((resolve) => listeners.push({ method, resolve }));
+
+try {
+  ws = new WebSocket(await connect());
+  await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.id && waiting.has(msg.id)) {
+      const w = waiting.get(msg.id); waiting.delete(msg.id);
+      msg.error ? w.reject(new Error(msg.error.message)) : w.resolve(msg.result);
+    } else if (msg.method) {
+      const i = listeners.findIndex((l) => l.method === msg.method);
+      if (i >= 0) listeners.splice(i, 1)[0].resolve(msg.params);
+    }
+  };
+  await send('Page.enable');
+  fs.mkdirSync(OUT, { recursive: true });
+
+  for (const width of widths) {
+    const height = fixedHeight || (width < 800 ? 844 : 900);
+    const mobile = width < 800;
+    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
+    await send('Emulation.setTouchEmulationEnabled', { enabled: mobile });
+    const loaded = once('Page.loadEventFired');
+    await send('Page.navigate', { url: BASE + page });
+    await loaded;
+    await send('Runtime.evaluate', {
+      expression: `document.fonts.ready.then(() => {
+        ${flag('cookies') ? '' : "document.querySelectorAll('.consent').forEach((el) => el.remove());"}
+        return document.documentElement.scrollWidth;
+      })`,
+      awaitPromise: true,
+    });
+    await sleep(600);
+    const { result } = await send('Runtime.evaluate', { expression: 'document.documentElement.scrollWidth' });
+    const { cssContentSize } = await send('Page.getLayoutMetrics');
+    const shotHeight = full ? Math.ceil(cssContentSize.height) : height;
+    const { data } = await send('Page.captureScreenshot', {
+      format: 'png', captureBeyondViewport: full,
+      clip: { x: 0, y: 0, width, height: shotHeight, scale: 1 },
+    });
+    const file = path.join(OUT, `${tag ? tag + '-' : ''}${name}-${width}.png`);
+    fs.writeFileSync(file, Buffer.from(data, 'base64'));
+    const overflow = result.value > width ? `  ⚠️ сторінка ширша за екран: ${result.value}px` : '';
+    console.log(`📸 ${path.relative(ROOT, file)} (${width}×${shotHeight})${overflow}`);
+  }
+} catch (err) {
+  console.error(`Не вдалося зробити скріншот: ${err.message}. Чи запущено перегляд (npm run preview)?`);
+  process.exitCode = 1;
+} finally {
+  ws?.close();
+  proc.kill();
+  await sleep(500);
+  try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* браузер ще тримає файли */ }
+}
