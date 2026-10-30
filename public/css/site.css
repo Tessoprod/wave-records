@@ -25,9 +25,11 @@
   --font-display: 'Archivo Black', 'Inter Tight', 'Arial Black', 'Helvetica Neue', system-ui, sans-serif;
   --font-text: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
-  --gutter: clamp(16px, 4vw, 40px);
+  /* Поля враховують виріз екрана iPhone у горизонтальному положенні */
+  --gutter: max(clamp(16px, 4vw, 40px), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
   --maxw: 1320px;
-  --header-h: 76px;
+  /* Висота зони шапки разом із «чубчиком» iPhone (safe-area зверху) */
+  --header-h: calc(76px + env(safe-area-inset-top, 0px));
 
   /* Рідке скло: одна система для всіх скляних елементів (клас .glass) */
   --glass-fill: linear-gradient(180deg, rgba(255, 255, 255, .075) 0%, rgba(255, 255, 255, .025) 100%);
@@ -100,7 +102,7 @@ h1, h2, h3, h4 { margin: 0; }
 .h2 { font-size: clamp(34px, 5vw, 72px); line-height: 1.06; text-wrap: balance; }
 .h3 { font-size: clamp(19px, 1.6vw, 24px); line-height: 1.05; }
 /* Останній захист: якщо одне довге слово не вміщається, воно переноситься, а не розширює сторінку */
-.h1, .h2, .tl-title, .bento-big { overflow-wrap: break-word; }
+.h1, .h2, .tl-title, .bento-big { overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; }
 .h-latin { letter-spacing: -.02em; }
 .page-lead, .sec-lead { color: var(--ink-2); font-size: clamp(17px, 1.5vw, 21px); line-height: 1.5; max-width: 34em; text-wrap: pretty; }
 .sec-sub { color: var(--ink-3); font-size: 17px; }
@@ -234,7 +236,7 @@ html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn
 .btn-red:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -3px 8px rgba(120, 0, 0, .25), 0 16px 40px -6px rgba(255, 46, 46, .7); }
 .btn-light { background: var(--white); color: var(--black); box-shadow: inset 0 -2px 4px rgba(0, 0, 0, .12), 0 10px 26px -8px rgba(255, 255, 255, .35); }
 .link-btn { background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; color: inherit; font-size: inherit; }
-.text-link { display: inline-flex; align-items: center; gap: .35em; color: var(--white); font-weight: 600; text-decoration: none; margin-top: 12px; transition: color .25s; }
+.text-link { display: inline-flex; align-items: center; min-height: 44px; gap: .35em; color: var(--white); font-weight: 600; text-decoration: none; margin-top: 2px; transition: color .25s; }
 .text-link:hover { color: var(--red); }
 .text-link .i { transition: transform .35s var(--ease-spring); }
 .text-link:hover .i { transform: translateX(4px); }
@@ -257,7 +259,7 @@ html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn
 
 .site-header {
   position: fixed; z-index: 50;
-  top: 12px; left: 50%; transform: translateX(-50%);
+  top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   width: min(var(--maxw) + 24px, 100% - 2 * var(--gutter) + 24px);
   height: 64px;
   display: flex; align-items: center; justify-content: space-between;
@@ -278,7 +280,7 @@ html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn
   box-shadow: var(--glass-shadow);
 }
 .site-header:hover::after { opacity: .6; }
-.logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-display); font-size: 20px; letter-spacing: -.01em; line-height: 1; }
+.logo { display: inline-flex; align-items: center; min-height: 44px; gap: 10px; text-decoration: none; font-family: var(--font-display); font-size: 20px; letter-spacing: -.01em; line-height: 1; }
 .logo-box { position: relative; display: block; }
 .logo-img { display: block; height: 36px; width: auto; max-width: 100%; }
 .logo-lg .logo-img { height: 64px; }
@@ -330,7 +332,7 @@ html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn
   transition: opacity .35s var(--ease);
 }
 .menu.is-open { opacity: 1; }
-.menu-inner { min-height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 48px; padding: calc(var(--header-h) + 48px) 0 40px; }
+.menu-inner { min-height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 48px; padding: calc(var(--header-h) + 48px) 0 calc(40px + env(safe-area-inset-bottom, 0px)); }
 .menu-links li { overflow: hidden; }
 .menu-links a {
   display: inline-flex; align-items: center; gap: 18px;
@@ -486,7 +488,7 @@ main { display: block; }
 /* ---------- Портфоліо ---------- */
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 32px; }
-.chip { display: inline-flex; align-items: center; min-height: 40px; padding: 0 18px; border-radius: var(--r-pill); border: 1px solid var(--line-2); text-decoration: none; font-weight: 600; font-size: 14px; transition: background-color .25s, border-color .25s, transform .35s var(--ease-spring); }
+.chip { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: var(--r-pill); border: 1px solid var(--line-2); text-decoration: none; font-weight: 600; font-size: 14px; transition: background-color .25s, border-color .25s, transform .35s var(--ease-spring); }
 .chip:hover { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .35); }
 @media (hover: hover) and (pointer: fine) { .chip:hover { transform: translateY(-2px); } }
 .chip:active { transform: scale(.96); }
@@ -711,6 +713,8 @@ main { display: block; }
 .mini-title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-time { font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .mini-meter { height: 32px; gap: 2px; }
+/* Поки відкритий міні-плеєр, низ сторінки не ховається під ним */
+body:has(.mini-player:not([hidden])) .site-footer { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
 
 /* ---------- Cookies ---------- */
 
@@ -727,22 +731,23 @@ main { display: block; }
   .track-body { grid-template-columns: minmax(0, 1fr); }
   .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bento-studio { grid-row: auto; }
 }
 
 @media (max-width: 860px) {
-  :root { --header-h: 68px; }
+  :root { --header-h: calc(68px + env(safe-area-inset-top, 0px)); }
   .header-book { display: none; }
-  .site-header { top: 8px; height: 58px; }
+  .site-header { top: calc(8px + env(safe-area-inset-top, 0px)); height: 58px; }
   .steps { grid-template-columns: 1fr; gap: 26px; padding: 0 0 0 40px; }
   .steps::before { top: 10px; bottom: 10px; left: 9px; right: auto; width: 2px; height: auto; background: linear-gradient(var(--red), rgba(255, 46, 46, .2) 70%, rgba(245, 245, 245, .12)); }
   .step-dot { top: 2px; left: -40px; }
   .phil-head { grid-template-columns: 1fr; }
   .phil-grid { grid-template-columns: 1fr; }
   .phil-item { min-height: 0; }
-  .timeline::before { left: 23px; }
-  .tl-item { grid-template-columns: 1fr; padding-left: 72px; }
+  .timeline::before { left: 19px; }
+  .tl-item { grid-template-columns: 1fr; padding-left: 58px; }
   .tl-item:nth-child(even) .tl-media { order: 0; }
-  .tl-num { width: 48px; height: 48px; font-size: 17px; }
+  .tl-num { width: 40px; height: 40px; font-size: 15px; }
   .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 44vw; }
   .g-item { grid-column: span 1 !important; grid-row: span 1 !important; }
   .g-0 { grid-column: span 2 !important; }
@@ -761,6 +766,8 @@ main { display: block; }
   .track-wave { height: 36px; }
   .hero { min-height: 88svh; }
   .h1 { font-size: min(44px, 10.6vw); }
+  /* Юридичні сторінки: довгі слова на кшталт «конфіденційності» мають вміщатися цілком */
+  .legal .h1 { font-size: min(40px, 8.2vw); }
   .final-cta { padding: 32px 24px; }
   .hero-l2 { font-size: calc(var(--hero-fs) * .55); }
   .hero-ctas { width: 100%; }
@@ -778,6 +785,30 @@ main { display: block; }
   .cta-band .btn { width: 100%; }
   .logo-img { height: 30px; }
   .logo-lg .logo-img { height: 52px; }
+}
+
+/* ---------- Сенсорні екрани й телефони ---------- */
+
+@media (max-width: 860px), (pointer: coarse) {
+  /* Зона натискання ≥ 44 px для посилань у футері й меню */
+  .footer-grid a, .footer-legal a, .footer-legal .link-btn, .menu-meta a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
+  /* Основний текст не дрібніший за 16 px */
+  .svc-desc, .site-footer, .menu-meta, .bf-hint, .book-embed-alt { font-size: 16px; }
+  .footer-bottom { font-size: 15px; }
+  .footer-links { gap: 0; }
+  .footer-legal { gap: 0 20px; }
+  .footer-bottom { align-items: center; }
+  .footer-grid a::after, .footer-legal a::after, .footer-legal .link-btn::after, .menu-meta a::after { bottom: 9px; }
+  /* Легше скло: менше розмиття — менше роботи для телефона */
+  :root { --glass-blur: blur(12px) saturate(150%); }
+  .menu { -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%); background: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .01)), rgba(12, 12, 12, .78); }
+}
+
+@media (max-width: 640px) {
+  /* Назва треку — до двох рядків замість обрізання */
+  .track-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .track-wave { height: 40px; }
+  .menu-links a { font-size: clamp(36px, 11vw, 56px); padding: 4px 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -120,9 +120,9 @@
   const root = document.documentElement;
   // Заломлення через SVG-фільтр у backdrop-filter уміє лише Chromium; Safari і Firefox лишаються з розмиттям
   const isChromium = !!navigator.userAgentData?.brands?.some((b) => /Chromium/.test(b.brand));
-  if (isChromium && !reduceMotion && CSS.supports?.('backdrop-filter', 'url(#lg-refract) blur(1px)')) root.classList.add('lg-refract');
-
   const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  // На телефонах і планшетах заломлення не вмикаємо — воно найдорожче для відеокарти
+  if (isChromium && finePointer && !reduceMotion && CSS.supports?.('backdrop-filter', 'url(#lg-refract) blur(1px)')) root.classList.add('lg-refract');
   const TILT = '.svc-card, .glass-card, .bento-card';
   const RIM = '.glass, .btn-glass, .btn-red, .track-play';
   const visibleGlass = new Set();
@@ -158,7 +158,8 @@
   }
   const scheduleGlass = () => { if (!glassRaf) glassRaf = requestAnimationFrame(glassFrame); };
 
-  if (!reduceMotion) {
+  // Смуга світла, що рухається при прокрутці, — лише на комп'ютерах; на телефонах скло статичне й легке
+  if (!reduceMotion && finePointer) {
     const glassIO = 'IntersectionObserver' in window && new IntersectionObserver((entries) => {
       entries.forEach((en) => (en.isIntersecting ? visibleGlass.add(en.target) : visibleGlass.delete(en.target)));
       scheduleGlass();
