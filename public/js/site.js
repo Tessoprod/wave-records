@@ -115,20 +115,134 @@
      --px (на <html>)   — положення курсора по горизонталі, від -1 до 1;
      --sy (на блоці)    — де блок на екрані по вертикалі, від -1 (вгорі) до 1 (внизу);
      --mx/--my          — курсор усередині блоку (відблиск по краю);
-     --rx/--ry          — нахил блоку до курсора, до 3°.
-     Смуга світла всередині скла зміщується від --px і --sy, тож скло «живе» при прокрутці й русі миші. */
+     --rx/--ry          — нахил блоку до курсора, до 3°;
+     --lg               — SVG-фільтр заломлення для цього блоку (лише Chromium на комп'ютері).
+     Смуга світла і райдужне ребро зміщуються від --px і --sy, тож скло «живе» при прокрутці й русі миші. */
   const root = document.documentElement;
-  // Заломлення через SVG-фільтр у backdrop-filter уміє лише Chromium; Safari і Firefox лишаються з розмиттям
+  // SVG-фільтр у backdrop-filter уміє лише Chromium; Safari і Firefox лишаються з розмиттям та імітацією призми
   const isChromium = !!navigator.userAgentData?.brands?.some((b) => /Chromium/.test(b.brand));
   const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
-  // На телефонах і планшетах заломлення не вмикаємо — воно найдорожче для відеокарти
-  if (isChromium && finePointer && !reduceMotion && CSS.supports?.('backdrop-filter', 'url(#lg-refract) blur(1px)')) root.classList.add('lg-refract');
+  // Слабкі пристрої (мало ядер чи пам'яті) і телефони отримують спрощене скло без заломлення
+  const weak = (navigator.hardwareConcurrency || 8) <= 2 || (navigator.deviceMemory || 8) < 2;
+  const refract = isChromium && finePointer && !weak && !!CSS.supports?.('backdrop-filter', 'url(#lg0) blur(1px)')
+    && 'IntersectionObserver' in window && 'ResizeObserver' in window;
+  if (refract) root.classList.add('lg-refract');
   const TILT = '.svc-card, .glass-card, .bento-card';
   const RIM = '.glass, .btn-glass, .btn-red, .track-play';
   const visibleGlass = new Set();
   let pointer = null;
   let hovered = null;
   let glassRaf = 0;
+
+  /* Заломлення. Для кожного унікального розміру (ширина × висота × радіус) — один SVG-фільтр:
+       feImage — карта зміщення: лінза з фаскою, біля краю пікселі тягнуться всередину, у центрі — нуль;
+       feDisplacementMap ×3 — окремо для червоного, зеленого й синього з трохи різною силою,
+       тож по краях виходить райдужна облямівка; канали розділяє feColorMatrix і зводить feComposite.
+     Фільтр вмикається лише для блоків, видимих на екрані. */
+  if (refract) {
+    const defs = $('.lg-defs');
+    const NS = 'http://www.w3.org/2000/svg';
+    const filters = new Map(); // розмір → id фільтра
+    const onScreen = new Set();
+
+    function lensMap(w, h, r, bevel) {
+      // Карту можна зробити меншою: браузер розтягне її плавно
+      const s = Math.min(1, Math.sqrt(120000 / (w * h)));
+      const cw = Math.max(2, Math.round(w * s));
+      const ch = Math.max(2, Math.round(h * s));
+      const c = document.createElement('canvas');
+      c.width = cw;
+      c.height = ch;
+      const g = c.getContext('2d');
+      const img = g.createImageData(cw, ch);
+      const d = img.data;
+      const hx = w / 2;
+      const hy = h / 2;
+      // Радіус кута не менший за фаску — тоді напрямок зміщення біля кутів змінюється плавно
+      const rr = Math.min(Math.max(r, bevel), hx, hy);
+      for (let j = 0; j < ch; j++) {
+        for (let i = 0; i < cw; i++) {
+          const x = ((i + 0.5) / cw) * w - hx;
+          const y = ((j + 0.5) / ch) * h - hy;
+          const ax = Math.abs(x);
+          const ay = Math.abs(y);
+          const qx = ax - (hx - rr);
+          const qy = ay - (hy - rr);
+          let e; let nx; let ny;
+          if (qx > 0 && qy > 0) {
+            const l = Math.hypot(qx, qy) || 1;
+            e = rr - l; nx = (qx / l) * Math.sign(x); ny = (qy / l) * Math.sign(y);
+          } else if (qx > qy) {
+            e = hx - ax; nx = Math.sign(x); ny = 0;
+          } else {
+            e = hy - ay; nx = 0; ny = Math.sign(y);
+          }
+          const t = Math.min(1, Math.max(0, 1 - e / bevel));
+          const m = t * t; // крутіше біля самого краю
+          const k = (j * cw + i) * 4;
+          d[k] = 128 - nx * m * 127;
+          d[k + 1] = 128 - ny * m * 127;
+          d[k + 2] = 128;
+          d[k + 3] = 255;
+        }
+      }
+      g.putImageData(img, 0, 0);
+      return c.toDataURL();
+    }
+
+    function filterFor(el) {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (w < 16 || h < 16) return '';
+      const cs = getComputedStyle(el);
+      const r = Math.min(parseFloat(cs.borderTopLeftRadius) || 0, w / 2, h / 2);
+      const blur = parseFloat(cs.getPropertyValue('--lg-blur')) || 3;
+      const key = `${w}x${h}r${Math.round(r)}b${blur}`;
+      let id = filters.get(key);
+      if (!id) {
+        id = `lg${filters.size}`;
+        // Ширина фаски і сила зміщення залежать від розміру; сила менша за фаску, щоб зображення не перекидалось
+        const bevel = Math.max(8, Math.min(42, Math.min(w, h) * 0.32));
+        const S = bevel * 0.9;
+        const f = document.createElementNS(NS, 'filter');
+        f.setAttribute('id', id);
+        f.setAttribute('x', '0'); f.setAttribute('y', '0');
+        f.setAttribute('width', '100%'); f.setAttribute('height', '100%');
+        f.setAttribute('color-interpolation-filters', 'sRGB');
+        const channels = [
+          ['1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0', S],
+          ['0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0', S * 0.86],
+          ['0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0', S * 0.72],
+        ];
+        f.innerHTML = `<feGaussianBlur in="SourceGraphic" stdDeviation="${blur}" result="src"/>`
+          + `<feImage href="${lensMap(w, h, r, bevel)}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none" result="map"/>`
+          + channels.map(([m, s], n) => `<feDisplacementMap in="src" in2="map" scale="${s.toFixed(1)}" xChannelSelector="R" yChannelSelector="G" result="d${n}"/>`
+            + `<feColorMatrix in="d${n}" type="matrix" values="${m}" result="c${n}"/>`).join('')
+          + '<feComposite in="c0" in2="c1" operator="arithmetic" k2="1" k3="1" result="rg"/>'
+          + '<feComposite in="rg" in2="c2" operator="arithmetic" k2="1" k3="1"/>';
+        defs.appendChild(f);
+        filters.set(key, id);
+      }
+      return `url(#${id})`;
+    }
+    const applyLens = (el) => {
+      const v = filterFor(el);
+      if (v) el.style.setProperty('--lg', v); else el.style.removeProperty('--lg');
+    };
+
+    const lensIO = new IntersectionObserver((entries) => entries.forEach((en) => {
+      if (en.isIntersecting) { onScreen.add(en.target); applyLens(en.target); } else { onScreen.delete(en.target); en.target.style.removeProperty('--lg'); }
+    }), { rootMargin: '120px 0px' });
+    // Розмір змінився — фільтр під новий розмір (з паузою, щоб не робити карти на кожен кадр під час зміни вікна)
+    const pending = new Set();
+    let lensT = 0;
+    const lensRO = new ResizeObserver((entries) => {
+      entries.forEach((en) => { if (onScreen.has(en.target)) pending.add(en.target); });
+      clearTimeout(lensT);
+      lensT = setTimeout(() => { pending.forEach((el) => onScreen.has(el) && applyLens(el)); pending.clear(); }, 160);
+    });
+    $$('.glass, .btn-glass, .track-play, .menu').forEach((el) => { lensIO.observe(el); lensRO.observe(el); });
+  }
 
   function glassFrame() {
     glassRaf = 0;
@@ -158,13 +272,13 @@
   }
   const scheduleGlass = () => { if (!glassRaf) glassRaf = requestAnimationFrame(glassFrame); };
 
-  // Смуга світла, що рухається при прокрутці, — лише на комп'ютерах; на телефонах скло статичне й легке
-  if (!reduceMotion && finePointer) {
+  // Положення блоків на екрані (--sy) — для смуги світла і райдужного ребра, і на телефонах теж
+  if (!reduceMotion) {
     const glassIO = 'IntersectionObserver' in window && new IntersectionObserver((entries) => {
       entries.forEach((en) => (en.isIntersecting ? visibleGlass.add(en.target) : visibleGlass.delete(en.target)));
       scheduleGlass();
     });
-    if (glassIO) $$('.glass, .btn-glass').forEach((el) => glassIO.observe(el));
+    if (glassIO) $$('.glass, .btn-glass, .track-play').forEach((el) => glassIO.observe(el));
     addEventListener('scroll', scheduleGlass, { passive: true });
     addEventListener('resize', scheduleGlass, { passive: true });
     if (finePointer) {
@@ -434,39 +548,282 @@
   }
 
   /* ---------- Інтерактивна хвиля на першому екрані ----------
-     Canvas із дзеркальними заокругленими смужками. Висота кожної смужки — сума:
+     Дзеркальні заокруглені смужки зі скла. Висота кожної смужки — сума:
        • «дихання» у спокої (форма запису голосу, що повільно змінюється);
        • музики, коли грає трек (той самий аналізатор, що й для міні-плеєра);
        • горба біля курсора/пальця і м'якого сліду за ним;
        • брижів від кліку чи дотику, що розходяться в обидва боки.
-     Усе згладжується, тож висоти змінюються плавно. */
+     Малює WebGL-шейдер: за текстуру береться поточний кадр динамічного фону (canvas з bg.js),
+     кожна смужка — скляна лінза: фон за нею заломлюється (сильніше біля країв), червоний, зелений і синій
+     канали зміщуються трохи по-різному (райдужна облямівка), по краях — м'яке френелівське світіння,
+     а блики рухаються за курсором, як за джерелом світла. Без WebGL — імітація у 2D-canvas. */
   const heroWave = $('[data-hero-wave]');
   if (heroWave) {
-    const canvas = $('canvas', heroWave);
-    const g = canvas.getContext && canvas.getContext('2d');
-    if (g) {
-      const DPR = Math.min(window.devicePixelRatio || 1, 2);
-      const STEP = 9; // відстань між смужками, px
-      let W = 0;
-      let H = 0;
-      let n = 0;
-      let idle = [];
-      let val = [];
-      let trail = [];
-      let fill = null;
-      let glow = null;
-      const ripples = [];
-      let ptr = null; // { x } — де курсор чи палець; null, якщо його немає над хвилею
-      let ptrStrength = 0;
-      let ptrX = 0;
-      const t0 = performance.now();
+    let canvas = $('canvas', heroWave);
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    const DPR = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
+    const MARGIN = 48; // запас фону навколо хвилі: заломлення бере пікселі трохи збоку
+    let STEP = 14; // відстань між смужками, px
+    let W = 0;
+    let H = 0;
+    let n = 0;
+    let idle = [];
+    let val = [];
+    let trail = [];
+    const ripples = [];
+    let ptr = null; // { x, y }
+    let ptrStrength = 0;
+    let ptrX = 0;
+    let ptrY = 0;
+    let clock = 0; // секунди від появи — для руху світла
+    const t0 = performance.now();
+    const x0 = () => (W - (n - 1) * STEP) / 2;
+    const barR = () => STEP * 0.33; // радіус смужки (ширина ≈ 2/3 кроку)
 
+    /* --- WebGL: скляні смужки --- */
+    const VERT = 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}';
+    const FRAG = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 uRes; uniform float uDpr, uW;
+uniform sampler2D uH; uniform float uN, uStep, uX0, uR, uCy, uMax;
+uniform sampler2D uBg; uniform vec4 uBgMap;
+uniform vec3 uLight;
+float hAt(float i){ vec4 t = texture2D(uH, vec2((i + .5) / uN, .5)); return (t.r * 65280. + t.g * 255.) / 65535. * uMax; }
+// Фірмовий градієнт: світлі краї → синій → червоний у центрі
+vec3 brand(float c){ vec3 col = mix(vec3(1., .18, .18), vec3(.21, .42, 1.), smoothstep(.02, .36, c)); return mix(col, vec3(.93, .94, .97), smoothstep(.34, .72, c)); }
+vec3 bgAt(vec2 p){ return texture2D(uBg, (p + uBgMap.xy) * uBgMap.zw).rgb; }
+void main(){
+  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uDpr;
+  float fi = floor((p.x - uX0) / uStep + .5);
+  float d = 1e4; vec2 q = vec2(0.); float rr = uR;
+  for (int k = -2; k <= 2; k++) {
+    float i = fi + float(k);
+    if (i < 0. || i > uN - 1.) continue;
+    float hh = max(hAt(i), .9);
+    float r = min(uR, hh);
+    float L = hh - r;
+    vec2 qq = p - vec2(uX0 + i * uStep, clamp(p.y, uCy - L, uCy + L));
+    float dd = length(qq) - r;
+    if (dd < d) { d = dd; q = qq; rr = r; }
+  }
+  float c = abs(p.x / uW - .5) * 2.;           // 0 — центр хвилі, 1 — краї
+  vec3 tint = brand(c);
+  float edgeFade = mix(1., .45, smoothstep(.35, 1., c));
+  float cover = clamp(.5 - d * uDpr, 0., 1.);
+  float glow = exp(-max(d, 0.) / 4.) * .12 * edgeFade * (1. - cover);
+  if (cover <= 0.) { gl_FragColor = vec4(tint * glow, glow * .6); return; }
+  // Смужка — скляний циліндр із заокругленими кінцями: нормаль із форми перерізу
+  float lq = length(q);
+  vec2 n2 = lq > 1e-4 ? q / lq : vec2(0.);
+  float s = clamp(lq / rr, 0., 1.);            // 0 — вісь смужки, 1 — край
+  float z = sqrt(max(1. - s * s, 0.));
+  vec3 N = normalize(vec3(n2 * s, z + .0001));
+  // Заломлення: зміщення вздовж нормалі, сильніше біля країв; R, G, B — з різною силою
+  vec2 off = -N.xy * rr * 2.6;
+  vec3 bg = vec3(bgAt(p + off * 1.18).r, bgAt(p + off).g, bgAt(p + off * .82).b);
+  // Світло від курсора: дзеркальний блиск і широкий м'який відблиск
+  vec3 Lv = normalize(vec3(uLight.xy - p, uLight.z));
+  float ndh = max(dot(N, normalize(Lv + vec3(0., 0., 1.))), 0.);
+  float spec = pow(ndh, 90.) * 1.4 + pow(ndh, 12.) * .14;
+  float fres = pow(1. - z, 2.4);
+  // Райдужна облямівка: червоний зовні, синій усередині
+  float e = -d;
+  vec3 fringe = vec3(exp(-pow((e - .2) / .55, 2.)), exp(-pow((e - .8) / .55, 2.)), exp(-pow((e - 1.4) / .55, 2.)));
+  float facing = pow(max(dot(n2, normalize(uLight.xy - p + vec2(.001))), 0.), 1.5);
+  // Тіло скла світиться фірмовим кольором рівномірно, край лише трохи світліший — без обведення
+  vec3 col = bg * 1.5
+    + tint * edgeFade * (.44 + .2 * fres)
+    + vec3(.85, .9, 1.) * fres * .14
+    + fringe * .55 * (.3 + .7 * facing) * (.5 + .5 * edgeFade)
+    + vec3(spec);
+  float a = cover * clamp(.74 + .2 * fres + spec, 0., 1.);
+  gl_FragColor = vec4(min(col, vec3(1.)) * a, a);
+}`;
+
+    function createGL(cv) {
+      let gl = null;
+      try { gl = cv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false }); } catch { gl = null; }
+      if (!gl) return null;
+      const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null; };
+      const vs = sh(gl.VERTEX_SHADER, VERT);
+      const fs = sh(gl.FRAGMENT_SHADER, FRAG);
+      const prog = vs && fs && gl.createProgram();
+      if (prog) { gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog); }
+      if (!prog || !gl.getProgramParameter(prog, gl.LINK_STATUS)) { gl.getExtension('WEBGL_lose_context')?.loseContext(); return null; }
+      gl.useProgram(prog);
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, 'a');
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      const u = {};
+      ['uRes', 'uDpr', 'uW', 'uH', 'uN', 'uStep', 'uX0', 'uR', 'uCy', 'uMax', 'uBg', 'uBgMap', 'uLight'].forEach((k) => { u[k] = gl.getUniformLocation(prog, k); });
+      const tex = (unit) => {
+        const t = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, unit ? gl.LINEAR : gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, unit ? gl.LINEAR : gl.NEAREST);
+        return t;
+      };
+      const hTex = tex(0);
+      const bgTex = tex(1);
+      gl.uniform1i(u.uH, 0);
+      gl.uniform1i(u.uBg, 1);
+      let hData = new Uint8Array(0);
+
+      // Фон за хвилею: темна основа, сітка точок і поточний кадр стрічок із bg.js
+      const back = document.createElement('canvas');
+      const bc = back.getContext('2d');
+      let dots = null;
+      if (bc) {
+        const tile = document.createElement('canvas');
+        tile.width = tile.height = 32;
+        const tc = tile.getContext('2d');
+        tc.fillStyle = 'rgba(245, 245, 245, .09)';
+        tc.beginPath(); tc.arc(16, 16, 1.2, 0, Math.PI * 2); tc.fill();
+        dots = bc.createPattern(tile, 'repeat');
+      }
+      function backdrop() {
+        const r = heroWave.getBoundingClientRect();
+        const w = Math.ceil(W + MARGIN * 2);
+        const h = Math.ceil(H + MARGIN * 2);
+        if (back.width !== w || back.height !== h) { back.width = w; back.height = h; }
+        const left = r.left - MARGIN;
+        const top = r.top - MARGIN;
+        bc.fillStyle = '#111';
+        bc.fillRect(0, 0, w, h);
+        const bgs = window.wrBg;
+        if (dots) {
+          const dy = (bgs ? bgs.dotsY : 0) - 32;
+          bc.save();
+          bc.translate(-left, dy - top);
+          bc.fillStyle = dots;
+          bc.fillRect(left, top - dy, w, h);
+          bc.restore();
+        }
+        const src = bgs && bgs.canvas;
+        if (src && src.width) {
+          const k = src.width / innerWidth;
+          try { bc.drawImage(src, left * k, top * k, w * k, h * k, 0, 0, w, h); } catch { /* фон ще не готовий */ }
+        }
+        return [w, h];
+      }
+
+      return {
+        draw() {
+          const [bw, bh] = backdrop();
+          gl.viewport(0, 0, cv.width, cv.height);
+          gl.clearColor(0, 0, 0, 0);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+          // Висоти смужок — у текстурі n×1, 16 біт на значення (R — старший байт, G — молодший)
+          if (hData.length !== n * 4) hData = new Uint8Array(n * 4);
+          for (let i = 0; i < n; i++) {
+            const v = Math.round(Math.min(1, Math.max(0, val[i])) * 65535);
+            hData[i * 4] = v >> 8;
+            hData[i * 4 + 1] = v & 255;
+            hData[i * 4 + 3] = 255;
+          }
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, hTex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, n, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, hData);
+          gl.activeTexture(gl.TEXTURE1);
+          gl.bindTexture(gl.TEXTURE_2D, bgTex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, back);
+          // Світло: курсор або палець, а без них — повільно пливе над хвилею
+          const ix = W * (0.5 + 0.32 * Math.sin(clock * 0.35));
+          const iy = -H * 0.5;
+          const k = ptrStrength;
+          gl.uniform2f(u.uRes, cv.width, cv.height);
+          gl.uniform1f(u.uDpr, DPR);
+          gl.uniform1f(u.uW, W);
+          gl.uniform1f(u.uN, n);
+          gl.uniform1f(u.uStep, STEP);
+          gl.uniform1f(u.uX0, x0());
+          gl.uniform1f(u.uR, barR());
+          gl.uniform1f(u.uCy, H / 2);
+          gl.uniform1f(u.uMax, H / 2 - 6);
+          gl.uniform4f(u.uBgMap, MARGIN, MARGIN, 1 / bw, 1 / bh);
+          gl.uniform3f(u.uLight, ix + (ptrX - ix) * k, iy + (ptrY - iy) * k, 70 + 50 * (1 - k));
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        },
+      };
+    }
+
+    /* --- Запасний варіант без WebGL: напівпрозорі смужки з відблисками і зсунутими червоною й синьою копіями країв --- */
+    function create2D(cv) {
+      const g = cv.getContext('2d');
+      if (!g) return null;
+      const capsule = (x, cy, h, r) => {
+        g.moveTo(x - r, cy - h + r);
+        g.arc(x, cy - h + r, r, Math.PI, 0);
+        g.lineTo(x + r, cy + h - r);
+        g.arc(x, cy + h - r, r, 0, Math.PI);
+        g.closePath();
+      };
+      const pass = (style, dx, shrink) => {
+        const cy = H / 2;
+        const max = H / 2 - 6;
+        const r0 = barR();
+        g.fillStyle = style;
+        g.beginPath();
+        for (let i = 0; i < n; i++) {
+          const h = Math.max(0.9, val[i] * max);
+          const r = Math.min(r0, h) * shrink;
+          capsule(x0() + i * STEP + dx, cy, Math.max(r, h - (r0 - r)), r);
+        }
+        g.fill();
+      };
+      return {
+        draw() {
+          g.setTransform(DPR, 0, 0, DPR, 0, 0);
+          g.clearRect(0, 0, W, H);
+          const grad = (a1, a2, a3) => {
+            const gr = g.createLinearGradient(0, 0, W, 0);
+            gr.addColorStop(0, `rgba(245, 245, 245, ${a1 * 0.4})`);
+            gr.addColorStop(0.18, `rgba(245, 245, 245, ${a1})`);
+            gr.addColorStop(0.34, `rgba(53, 107, 255, ${a2})`);
+            gr.addColorStop(0.5, `rgba(255, 46, 46, ${a3})`);
+            gr.addColorStop(0.66, `rgba(53, 107, 255, ${a2})`);
+            gr.addColorStop(0.82, `rgba(245, 245, 245, ${a1})`);
+            gr.addColorStop(1, `rgba(245, 245, 245, ${a1 * 0.4})`);
+            return gr;
+          };
+          g.globalCompositeOperation = 'lighter';
+          pass('rgba(255, 60, 60, .32)', -1.2, 1); // червона копія краю
+          pass('rgba(70, 120, 255, .36)', 1.2, 1); // синя копія краю
+          g.globalCompositeOperation = 'source-over';
+          pass(grad(0.2, 0.42, 0.5), 0, 1); // тіло смужки
+          g.globalCompositeOperation = 'lighter';
+          pass('rgba(255, 255, 255, .5)', -barR() * 0.35, 0.28); // відблиск уздовж лівого краю
+          g.globalCompositeOperation = 'source-over';
+        },
+      };
+    }
+
+    let renderer = createGL(canvas);
+    if (!renderer) {
+      // Canvas, на якому вже пробували WebGL, не дасть 2D-контекст — підміняємо його чистим
+      const fresh = canvas.cloneNode(false);
+      canvas.replaceWith(fresh);
+      canvas = fresh;
+      renderer = create2D(canvas);
+    }
+
+    if (renderer) {
       function layoutWave() {
         W = heroWave.clientWidth || 300;
         H = heroWave.clientHeight || 100;
+        STEP = W >= 700 ? 14 : 11;
         canvas.width = Math.round(W * DPR);
         canvas.height = Math.round(H * DPR);
-        g.setTransform(DPR, 0, 0, DPR, 0, 0);
         const count = Math.max(24, Math.min(170, Math.floor(W / STEP)));
         if (count !== n) {
           n = count;
@@ -474,54 +831,13 @@
           val = reduceMotion ? idle.slice() : val.length === n ? val : new Array(n).fill(0.03);
           trail = new Array(n).fill(0);
         }
-        // Світлі краї, сині й червоні акценти ближче до центру
-        fill = g.createLinearGradient(0, 0, W, 0);
-        fill.addColorStop(0, 'rgba(245, 245, 245, .16)');
-        fill.addColorStop(0.18, 'rgba(245, 245, 245, .42)');
-        fill.addColorStop(0.34, 'rgba(53, 107, 255, .85)');
-        fill.addColorStop(0.5, 'rgba(255, 46, 46, .95)');
-        fill.addColorStop(0.66, 'rgba(53, 107, 255, .85)');
-        fill.addColorStop(0.82, 'rgba(245, 245, 245, .42)');
-        fill.addColorStop(1, 'rgba(245, 245, 245, .16)');
-        glow = g.createLinearGradient(0, 0, W, 0);
-        glow.addColorStop(0, 'rgba(245, 245, 245, 0)');
-        glow.addColorStop(0.34, 'rgba(53, 107, 255, .14)');
-        glow.addColorStop(0.5, 'rgba(255, 46, 46, .18)');
-        glow.addColorStop(0.66, 'rgba(53, 107, 255, .14)');
-        glow.addColorStop(1, 'rgba(245, 245, 245, 0)');
-      }
-
-      function drawWave() {
-        g.clearRect(0, 0, W, H);
-        const cy = H / 2;
-        const max = H / 2 - 4;
-        const bw = Math.max(2, STEP * 0.5);
-        const xOf = (i) => (W - (n - 1) * STEP) / 2 + i * STEP;
-        g.lineCap = 'round';
-        // Світіння: ті самі смужки, ширші й прозорі
-        g.strokeStyle = glow;
-        g.lineWidth = bw * 2.6;
-        g.beginPath();
-        for (let i = 0; i < n; i++) {
-          const h = Math.max(0.5, val[i] * max);
-          g.moveTo(xOf(i), cy - h); g.lineTo(xOf(i), cy + h);
-        }
-        g.stroke();
-        g.strokeStyle = fill;
-        g.lineWidth = bw;
-        g.beginPath();
-        for (let i = 0; i < n; i++) {
-          const h = Math.max(0.5, val[i] * max - bw / 2);
-          g.moveTo(xOf(i), cy - h); g.lineTo(xOf(i), cy + h);
-        }
-        g.stroke();
       }
 
       layoutWave();
       if (reduceMotion) {
-        // Статична хвиля без анімації
-        drawWave();
-        addEventListener('resize', () => { layoutWave(); drawWave(); }, { passive: true });
+        // Статичний кадр без анімації (фон теж статичний)
+        renderer.draw();
+        addEventListener('resize', () => { layoutWave(); renderer.draw(); }, { passive: true });
       } else {
         const easeOutBack = (x) => 1 + 2.2 * (x - 1) ** 3 + 1.2 * (x - 1) ** 2;
         let raf = 0;
@@ -533,17 +849,18 @@
           const dt = Math.min(0.05, (now - prev) / 1000);
           prev = now;
           const t = (now - t0) / 1000;
+          clock = t;
           const live = !!analyser && !audio.paused && !!freq;
           if (live) analyser.getByteFrequencyData(freq);
           ptrStrength += ((ptr ? 1 : 0) - ptrStrength) * Math.min(1, dt * 8);
-          if (ptr) ptrX += (ptr.x - ptrX) * Math.min(1, dt * 14);
+          if (ptr) { ptrX += (ptr.x - ptrX) * Math.min(1, dt * 14); ptrY += (ptr.y - ptrY) * Math.min(1, dt * 14); }
           const sigma = Math.max(28, W * 0.045);
           const bins = freq ? freq.length * 0.7 : 0;
 
           for (let i = ripples.length - 1; i >= 0; i--) if (t - ripples[i].t > 2.4) ripples.splice(i, 1);
 
           for (let i = 0; i < n; i++) {
-            const x = (W - (n - 1) * STEP) / 2 + i * STEP;
+            const x = x0() + i * STEP;
             // Дихання: форма запису голосу, що повільно змінюється
             const breathe = 0.78 + 0.16 * Math.sin(t * 0.9 + i * 0.19) * Math.sin(t * 0.37 + i * 0.045) + 0.06 * Math.sin(t * 2.1 + i * 0.7);
             let target = idle[i] * breathe;
@@ -571,27 +888,29 @@
             const k = live ? 0.4 : 0.16;
             val[i] += (target - val[i]) * Math.min(1, k * dt * 60);
           }
-          drawWave();
+          renderer.draw();
           if (visible && !document.hidden) raf = requestAnimationFrame(frame);
         }
         const start = () => { if (!raf && visible && !document.hidden) { prev = performance.now(); raf = requestAnimationFrame(frame); } };
 
+        // Пауза, коли хвилю не видно або вкладка неактивна
         if ('IntersectionObserver' in window) {
           new IntersectionObserver(([en]) => { visible = en.isIntersecting; if (visible) start(); }).observe(heroWave);
         }
         document.addEventListener('visibilitychange', start);
 
-        const localX = (e) => e.clientX - heroWave.getBoundingClientRect().left;
+        const local = (e) => { const r = heroWave.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
         heroWave.addEventListener('pointermove', (e) => {
-          const x = localX(e);
-          if (!ptr) ptrX = x;
-          ptr = { x };
+          const p = local(e);
+          if (!ptr) { ptrX = p.x; ptrY = p.y; }
+          ptr = p;
         }, { passive: true });
         heroWave.addEventListener('pointerdown', (e) => {
-          const x = localX(e);
-          ptr = { x };
-          ptrX = x;
-          ripples.push({ x, t: (performance.now() - t0) / 1000 });
+          const p = local(e);
+          ptr = p;
+          ptrX = p.x;
+          ptrY = p.y;
+          ripples.push({ x: p.x, t: (performance.now() - t0) / 1000 });
           if (ripples.length > 6) ripples.shift();
           start();
         }, { passive: true });
@@ -603,7 +922,7 @@
         let waveResizeT;
         addEventListener('resize', () => {
           clearTimeout(waveResizeT);
-          waveResizeT = setTimeout(() => { layoutWave(); drawWave(); }, 150);
+          waveResizeT = setTimeout(() => { layoutWave(); renderer.draw(); }, 150);
         }, { passive: true });
         start();
       }

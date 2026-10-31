@@ -14,6 +14,8 @@
   const grain = host.querySelector('.bg-grain');
   const ctx = canvas && canvas.getContext && canvas.getContext('2d');
   if (!ctx) return; // без canvas лишається CSS-градієнт .bg
+  // Скляна хвиля на головній (site.js) бере цей canvas як «фон за склом» і заломлює його
+  const shared = window.wrBg = { canvas, dotsY: 0 };
 
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const small = matchMedia('(max-width: 760px)').matches;
@@ -124,7 +126,8 @@
     ctx.lineJoin = 'round';
     for (const r of ribbons) drawRibbon(r, t, scroll);
     ctx.globalCompositeOperation = 'source-over';
-    if (dots) dots.style.transform = `translate3d(0, ${(-(scroll * DOTS_PARALLAX) % DOT_STEP).toFixed(2)}px, 0)`;
+    shared.dotsY = -(scroll * DOTS_PARALLAX) % DOT_STEP;
+    if (dots) dots.style.transform = `translate3d(0, ${shared.dotsY.toFixed(2)}px, 0)`;
   }
 
   resize();
