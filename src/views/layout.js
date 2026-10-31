@@ -101,6 +101,7 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter+Tight:wght@800;900&family=Inter:wght@400;500;600;700&display=swap">
+  <script>document.documentElement.classList.add('js')</script>
   <link rel="stylesheet" href="${asset('vendor/lenis-1.3.27.css')}">
   <link rel="stylesheet" href="${asset('css/site.css')}">
   ${analyticsHead(s)}

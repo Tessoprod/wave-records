@@ -377,8 +377,28 @@ main { display: block; }
 
 /* ---------- Hero ---------- */
 
-.hero { position: relative; min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end; padding-top: calc(var(--header-h) + 40px); overflow: hidden; }
+.hero { position: relative; isolation: isolate; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding-top: calc(var(--header-h) + 24px); overflow: hidden; }
+/* 3D-скульптура (public/js/hero3d.js, запускає motion.js). Поки сцена вантажиться, а також без WebGL
+   чи з prefers-reduced-motion видно статичний кадр сцени (hero-fallback.webp) на CSS-градієнті.
+   Низ сцени плавно переходить у темну сторінку. */
+.hero-scene {
+  position: absolute; inset: 0; z-index: -1;
+  background:
+    url('../img/hero-fallback.webp') center / cover no-repeat,
+    radial-gradient(40% 45% at 38% 40%, rgba(var(--pink-rgb), .14), transparent 70%),
+    radial-gradient(35% 40% at 66% 62%, rgba(var(--cyan-rgb), .08), transparent 70%),
+    var(--black);
+  -webkit-mask-image: linear-gradient(#000 72%, transparent);
+  mask-image: linear-gradient(#000 72%, transparent);
+}
+.hero-scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1.2s var(--ease); }
+.hero-scene.is-ready canvas { opacity: 1; }
+/* Поява заголовка: motion.js анімує його й ставить .is-in; якщо скрипт не спрацював — текст однаково з'являється */
+html.js [data-hero-intro]:not(.is-in) { opacity: 0; animation: hero-failsafe .6s 2.5s forwards; }
+@keyframes hero-failsafe { to { opacity: 1; } }
 .hero-inner { position: relative; z-index: 1; padding-bottom: clamp(32px, 5vw, 56px); display: flex; flex-direction: column; align-items: center; text-align: center; }
+/* Текст поверх скла: м'яка темна тінь, щоб читався на будь-якому відблиску */
+.hero-title, .hero-sub { text-shadow: 0 2px 30px rgba(17, 17, 17, .6), 0 1px 3px rgba(17, 17, 17, .35); }
 /* Розмір рядка WAVE RECORDS рахується від ширини контейнера (≈8.7 em у шрифті Archivo Black);
    якщо рядок усе ж не вміщається, site.js зменшує --hero-fs. Другий рядок — половина першого. */
 .hero-title { --hero-fs: clamp(28px, calc(min(100vw - 2 * var(--gutter), var(--maxw)) / 9), 168px); display: flex; flex-direction: column; align-items: center; max-width: 100%; line-height: 1; }
@@ -391,9 +411,6 @@ main { display: block; }
 /* Лінія рівня гучності: смужки малює site.js, під час відтворення вони рухаються під музику */
 .meter { display: flex; align-items: center; gap: 3px; }
 .meter i { flex: 1 1 0; min-width: 2px; height: 100%; border-radius: 99px; background: rgba(245, 245, 245, .16); transform: scaleY(var(--v, .1)); transform-origin: 50% 50%; transition: transform .12s linear, background-color .4s; }
-/* Хвиля на першому екрані: canvas малює site.js; touch-action: pan-y — палець веде хвилю вбік, а вертикальний жест гортає сторінку */
-.hero-meter { position: relative; z-index: 0; height: clamp(80px, 12vw, 150px); width: calc(100% - 2 * var(--gutter)); max-width: var(--maxw); margin: 0 auto clamp(24px, 4vw, 40px); cursor: pointer; touch-action: pan-y; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
-.hero-meter canvas { display: block; width: 100%; height: 100%; }
 .meter.is-live i { background: rgba(var(--cyan-rgb), .75); }
 .meter.is-live i:nth-child(7n + 3) { background: var(--pink); }
 

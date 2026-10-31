@@ -103,7 +103,15 @@ try {
       })`,
       awaitPromise: true,
     });
-    await sleep(600);
+    // 3D-сцена на головній запускається після завантаження — чекаємо її (або запасний кадр), до 12 с
+    await send('Runtime.evaluate', {
+      expression: `new Promise((ok) => { const t0 = Date.now(); (function wait() {
+        const h = document.querySelector('[data-hero-scene]');
+        if (!h || h.matches('.is-ready, .is-fallback') || Date.now() - t0 > 12000) return ok(true);
+        setTimeout(wait, 100); })(); })`,
+      awaitPromise: true,
+    });
+    await sleep(page === '/' ? 2200 : 600); // на головній — ще й поява заголовка
     if (hover) {
       const { result: pos } = await send('Runtime.evaluate', {
         expression: `(() => { const el = document.querySelector(${JSON.stringify(hover)}); if (!el) return null;

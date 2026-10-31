@@ -61,7 +61,8 @@ export function homePage({ homeServices, tracks }) {
   const body = html`
   ${hero.visible ? html`
   <section class="hero">
-    <div class="container hero-inner">
+    <div class="hero-scene" data-hero-scene aria-hidden="true"></div>
+    <div class="container hero-inner" data-hero-intro>
       <h1 class="hero-title">
         <span class="hero-l1">${hero.line1}</span>
         <span class="hero-l2">${hero.line2}</span>
@@ -74,7 +75,6 @@ export function homePage({ homeServices, tracks }) {
         </div>
       </div>
     </div>
-    <div class="hero-meter" data-hero-wave aria-hidden="true"><canvas></canvas></div>
   </section>` : ''}
 
   ${svc.visible && homeServices.length ? html`
