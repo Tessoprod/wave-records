@@ -112,6 +112,15 @@ try {
       awaitPromise: true,
     });
     await sleep(page === '/' ? 2200 : 600); // на головній — ще й поява заголовка
+    if (full) {
+      // Анімації на скролі запускаються при першій появі: прогортаємо сторінку донизу й назад
+      await send('Runtime.evaluate', {
+        expression: `(async () => { const w = (ms) => new Promise((r) => setTimeout(r, ms));
+          for (let y = 0; y <= document.documentElement.scrollHeight; y += innerHeight * 0.5) { scrollTo(0, y); window.wrMotion?.lenis?.scrollTo(y, { immediate: true }); await w(150); }
+          await w(1500); scrollTo(0, 0); window.wrMotion?.lenis?.scrollTo(0, { immediate: true }); await w(600); })()`,
+        awaitPromise: true,
+      });
+    }
     if (hover) {
       const { result: pos } = await send('Runtime.evaluate', {
         expression: `(() => { const el = document.querySelector(${JSON.stringify(hover)}); if (!el) return null;

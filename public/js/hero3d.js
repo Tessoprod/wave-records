@@ -12,8 +12,11 @@
      • оточення для відблисків — власне градієнтне (PMREM), без HDR-файлів;
      • світло — рожеве #FF2E9A і ціанове #00E5FF з різних боків.
 
-   createHeroScene(host) повертає об'єкт стану: motion.js прив'язує до нього скрол (setScroll),
-   а наступні етапи можуть рухати скульптуру через state. */
+   createHeroScene(host) повертає об'єкт стану. motion.js:
+     • прив'язує скрол першого екрана (setScroll, useScroll);
+     • переносить canvas в інший контейнер (attach) — так скульптура супроводжує секцію «Як це працює»;
+     • задає «настрій» (setMood): сила хвилювання, дрібна брижа, швидкість обертання, зсув і масштаб.
+       Настрій змінюється плавно. */
 
 import * as THREE from '../vendor/three.module-0.187.0.min.js';
 
@@ -244,11 +247,18 @@ export function createHeroScene(host, { mobile = false, weak = false } = {}) {
   scene.add(group);
 
   /* ---------- Стан (його читає й змінює motion.js) ---------- */
+  // Настрій за замовчуванням: amp — хвилювання, detail — дрібна брижа, spin — обертання (рад/с),
+  // x, y — зсув у сцені, scale — множник розміру
+  const MOOD = { amp: 1, detail: 0, spin: 0.12, x: 0, y: 0, scale: 1 };
   const state = {
     scroll: 0,         // 0 — перший екран на місці, 1 — прокручений
+    useScroll: true,   // скрол першого екрана впливає на позицію (вимикається в інших секціях)
     tiltX: 0, tiltY: 0, // поточний нахил
     level: 0,          // рівень музики, 0…1
     running: false,
+    mood: { ...MOOD },
+    moodTarget: { ...MOOD },
+    get host() { return host; },
     group, mesh, material, uniforms, scene, camera, renderer,
   };
 
@@ -325,6 +335,7 @@ export function createHeroScene(host, { mobile = false, weak = false } = {}) {
   let raf = 0;
   let bass = 0;
   let mid = 0;
+  let spin = 0;
 
   function frame(now) {
     raf = state.running ? requestAnimationFrame(frame) : 0;
@@ -342,8 +353,10 @@ export function createHeroScene(host, { mobile = false, weak = false } = {}) {
     // Дихання в спокої + музика
     const breathe = 0.85 + 0.15 * Math.sin(time * 0.8);
     uniforms.uTime.value = time;
-    uniforms.uAmp.value = breathe * (1 + bass * 2.2);
-    uniforms.uDetail.value = mid;
+    const m = state.mood;
+    for (const key in m) m[key] += (state.moodTarget[key] - m[key]) * k(2.2);
+    uniforms.uAmp.value = breathe * m.amp * (1 + bass * 2.2);
+    uniforms.uDetail.value = Math.max(mid, m.detail);
 
     // Вм'ятина під курсором
     pressAmt += ((pointer?.point ? 1 : 0) - pressAmt) * k(6);
@@ -353,16 +366,17 @@ export function createHeroScene(host, { mobile = false, weak = false } = {}) {
     // Нахил до курсора і повільне обертання
     state.tiltX += ((pointer ? -pointer.y * 0.35 : 0) - state.tiltX) * k(3);
     state.tiltY += ((pointer ? pointer.x * 0.5 : 0) - state.tiltY) * k(3);
-    mesh.rotation.y = time * 0.12;
+    spin += dt * m.spin;
+    mesh.rotation.y = spin;
     mesh.rotation.x = Math.sin(time * 0.2) * 0.12;
     group.rotation.x = state.tiltX;
     group.rotation.y = state.tiltY;
 
     // Скрол: скульптура віддаляється, зменшується і зміщується вгору й вправо
-    const s = state.scroll;
+    const s = state.useScroll ? state.scroll : 0;
     const e = s * s * (3 - 2 * s);
-    group.scale.setScalar(state.baseScale * (1 - 0.4 * e) * (1 + bass * 0.06));
-    group.position.set(e * 1.3, e * 0.9, -e * 2.5);
+    group.scale.setScalar(state.baseScale * m.scale * (1 - 0.4 * e) * (1 + bass * 0.06));
+    group.position.set(e * 1.3 + m.x, e * 0.9 + m.y, -e * 2.5);
 
     backdrop.material.uniforms.uTime.value = time;
     renderer.render(scene, camera);
@@ -371,6 +385,14 @@ export function createHeroScene(host, { mobile = false, weak = false } = {}) {
   state.start = () => { if (!state.running) { state.running = true; last = performance.now(); raf = requestAnimationFrame(frame); } };
   state.stop = () => { state.running = false; cancelAnimationFrame(raf); raf = 0; };
   state.setScroll = (v) => { state.scroll = Math.min(1, Math.max(0, v)); };
+  state.setMood = (mood = {}) => { Object.assign(state.moodTarget, MOOD, mood); };
+  // Перенести canvas в інший контейнер (розмір і камера підлаштовуються під нього)
+  state.attach = (el) => {
+    if (!el || el === host) return;
+    host = el;
+    el.appendChild(canvas);
+    resize();
+  };
   state.renderOnce = () => frame(performance.now());
   state.resize = resize;
   state.dispose = () => {

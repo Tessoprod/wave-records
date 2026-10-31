@@ -42,6 +42,13 @@ function photoImg(p, { sizes = '100vw', cls = '', eager = false } = {}) {
 /** Графічний фрагмент на місці фото, поки студія не завантажила свої кадри. */
 const fragment = (n, label = '') => html`<div class="fragment fragment-${n % 4}" role="img" aria-label="${label || 'Графічний фрагмент Wave Records'}"><span></span><span></span><span></span></div>`;
 
+/** Біжучий рядок між секціями головної (рух задає motion.js; без нього рядок просто стоїть). */
+const MARQUEE_WORDS = ['WAVE RECORDS', 'RECORD', 'PRODUCE', 'MIX', 'MASTER', 'RELEASE'];
+const marquee = () => html`
+  <div class="marquee" aria-hidden="true" data-marquee>
+    <div class="marquee-track">${[0, 1].map(() => html`<span class="marquee-set">${MARQUEE_WORDS.map((w) => html`<span>${w}</span><i>●</i>`)}</span>`)}</div>
+  </div>`;
+
 const bookHref = (s) => (s.slug ? `/book?service=${s.slug}` : '/book');
 
 function telegramUrl() {
@@ -97,6 +104,8 @@ export function homePage({ homeServices, tracks }) {
     </div>
   </section>` : ''}
 
+  ${marquee()}
+
   ${works.visible ? html`
   <section class="section section-works" id="works">
     <div class="container">
@@ -127,7 +136,8 @@ export function homePage({ homeServices, tracks }) {
   </section>` : ''}
 
   ${steps.visible ? html`
-  <section class="section section-steps">
+  <section class="section section-steps" data-steps>
+    <div class="steps-scene" data-steps-scene aria-hidden="true"></div>
     <div class="container">
       <header class="sec-head"><h2 class="h2">${steps.title}</h2></header>
       <ol class="steps" role="list">

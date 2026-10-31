@@ -337,9 +337,11 @@ html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1);
   overflow-y: auto;
   opacity: 0;
-  transition: opacity .35s var(--ease);
+  /* Розкривається колом із центру кнопки «Меню» (--menu-x/--menu-y ставить site.js) */
+  clip-path: circle(0px at var(--menu-x, 100%) var(--menu-y, 0%));
+  transition: opacity .3s var(--ease) .25s, clip-path .55s cubic-bezier(.7, 0, .84, 0);
 }
-.menu.is-open { opacity: 1; }
+.menu.is-open { opacity: 1; clip-path: circle(150vmax at var(--menu-x, 100%) var(--menu-y, 0%)); transition: opacity .2s var(--ease), clip-path .95s cubic-bezier(.16, 1, .3, 1); }
 .menu-inner { min-height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 48px; padding: calc(var(--header-h) + 48px) 0 calc(40px + env(safe-area-inset-bottom, 0px)); }
 .menu-links li { overflow: hidden; }
 .menu-links a {
@@ -347,16 +349,17 @@ html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn
   font-size: clamp(42px, 8.4vw, 104px); line-height: 1.02;
   text-decoration: none;
   transform: translateY(105%);
-  transition: transform .6s var(--ease), color .25s;
+  transition: transform .5s var(--ease), color .25s;
 }
-.menu.is-open .menu-links a { transform: none; }
-.menu-links li:nth-child(2) a { transition-delay: .03s; }
-.menu-links li:nth-child(3) a { transition-delay: .06s; }
-.menu-links li:nth-child(4) a { transition-delay: .09s; }
-.menu-links li:nth-child(5) a { transition-delay: .12s; }
-.menu-links li:nth-child(6) a { transition-delay: .15s; }
+/* Пункти з'являються каскадом, коли коло вже розкривається */
+.menu.is-open .menu-links a { transform: none; transition: transform .9s cubic-bezier(.16, 1, .3, 1) .12s, color .25s; }
+.menu.is-open .menu-links li:nth-child(2) a { transition-delay: .18s, 0s; }
+.menu.is-open .menu-links li:nth-child(3) a { transition-delay: .24s, 0s; }
+.menu.is-open .menu-links li:nth-child(4) a { transition-delay: .3s, 0s; }
+.menu.is-open .menu-links li:nth-child(5) a { transition-delay: .36s, 0s; }
+.menu.is-open .menu-links li:nth-child(6) a { transition-delay: .42s, 0s; }
 @media (hover: hover) and (pointer: fine) {
-  .menu.is-open .menu-links a:hover { color: var(--pink); transform: translateX(12px); transition-delay: 0s; }
+  .menu.is-open .menu-links li:nth-child(n) a:hover { color: var(--pink); transform: translateX(12px); transition-delay: 0s; }
 }
 .menu-links a[aria-current="page"]::after { content: ''; width: .2em; height: .2em; border-radius: 50%; background: var(--pink); box-shadow: 0 0 24px rgba(var(--pink-rgb), .35); }
 .menu-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; color: var(--ink-2); font-size: 15px; border-top: 1px solid var(--line); padding-top: 24px; }
@@ -747,6 +750,89 @@ body:has(.mini-player:not([hidden])) .site-footer { padding-bottom: calc(110px +
 .consent a { color: var(--white); }
 .consent-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 
+/* ---------- Анімації на скролі й мікровзаємодії (public/js/motion.js) ----------
+   Стартові приховані стани діють лише з класом html.wr-anim. Його ставить вбудований скрипт у <head>
+   і сам же знімає через 4 с, якщо motion.js не запустився. Без JS або при помилці весь вміст видно.
+   Список тут має збігатися з тим, що проявляє motion.js. */
+
+html.wr-anim main :is(.h1, .h2, .page-lead, .sec-lead, .sec-sub, .chapter):not(dialog *),
+html.wr-anim :is(.svc-grid, .svc-full-grid, .phil-grid, .why-grid, .bento, .book-info, .gallery, .tracks, .chips) > *,
+html.wr-anim :is(.book-embed, .cta-band, .tl-text, .empty-state) { opacity: 0; }
+html.wr-anim .tl-media { clip-path: inset(100% 0 0 0); }
+html.wr-anim .steps { --steps-p: 0; }
+html.wr-anim .timeline { --tl-p: 0; }
+
+/* Магнітні кнопки: зсув задає motion.js через змінні (окрема властивість translate не заважає transform наведення) */
+.btn { translate: var(--magx, 0px) var(--magy, 0px); }
+
+/* Біжучий рядок між секціями головної */
+.marquee { overflow: hidden; padding-top: clamp(64px, 9vw, 130px); pointer-events: none; -webkit-user-select: none; user-select: none; }
+.marquee-track { display: flex; width: max-content; will-change: transform; }
+.marquee-set {
+  display: flex; align-items: center; gap: .32em; padding-right: .32em;
+  font-family: var(--font-display); font-weight: 900; font-synthesis: none; text-transform: uppercase;
+  font-size: clamp(56px, 9vw, 150px); line-height: 1.05; letter-spacing: -.01em; white-space: nowrap;
+  color: transparent; -webkit-text-stroke: 1.5px rgba(245, 245, 245, .3);
+}
+.marquee-set i { font-style: normal; font-size: .3em; color: var(--pink); -webkit-text-stroke: 0; text-shadow: 0 0 18px rgba(var(--pink-rgb), .35); }
+
+/* Як це працює: лінія прогресу заповнюється від рожевого до ціанового, кроки підсвічуються по черзі */
+.section-steps { position: relative; isolation: isolate; }
+.steps-scene {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  -webkit-mask-image: linear-gradient(transparent, #000 16%, #000 84%, transparent);
+  mask-image: linear-gradient(transparent, #000 16%, #000 84%, transparent);
+}
+.steps-scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.section-steps.is-pinned { min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding-top: var(--header-h); }
+.steps::after {
+  content: ''; position: absolute; top: 9px; left: 10px; right: 10px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--pink), var(--cyan));
+  box-shadow: 0 0 12px rgba(var(--pink-rgb), .35);
+  transform-origin: 0 50%; transform: scaleX(var(--steps-p, 1));
+}
+.step { transition: opacity .5s var(--ease); }
+.step-dot { transition: background-color .4s var(--ease), box-shadow .4s var(--ease); }
+.step-title { text-shadow: 0 2px 24px rgba(17, 17, 17, .7); }
+html.wr-anim .step:not(.is-on) { opacity: .38; }
+html.wr-anim .step:first-child:not(.is-on) .step-dot { background: var(--black); box-shadow: none; }
+.step.is-on .step-dot { background: var(--pink); }
+.step.is-current .step-dot { box-shadow: 0 0 22px rgba(var(--pink-rgb), .35); }
+
+/* Про студію: лінія таймлайну заповнюється при скролі */
+.timeline::before { background: rgba(245, 245, 245, .1); }
+.timeline::after {
+  content: ''; position: absolute; left: 31px; top: 12px; bottom: 12px; width: 2px; border-radius: 2px;
+  background: linear-gradient(var(--pink), var(--cyan));
+  box-shadow: 0 0 10px rgba(var(--pink-rgb), .3);
+  transform-origin: 50% 0; transform: scaleY(var(--tl-p, 1));
+}
+.tl-num { z-index: 1; }
+
+/* Пункти меню: при наведенні літери прокручуються (розмітку .roll будує motion.js) */
+.roll { position: relative; display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .04em; }
+.roll-a, .roll-b { display: block; white-space: pre; }
+.roll-b { position: absolute; left: 0; top: 100%; }
+.roll-c { display: inline-block; transition: transform .55s var(--ease); transition-delay: calc(var(--i) * 18ms); }
+@media (hover: hover) and (pointer: fine) {
+  .menu-links a:hover .roll-c, .menu-links a:focus-visible .roll-c { transform: translateY(-100%); }
+}
+
+/* Власний курсор (лише миша; над полями вводу та iframe — системний) */
+html.has-cursor, html.has-cursor * { cursor: none !important; }
+html.has-cursor :is(input, textarea, select, iframe, [contenteditable="true"]) { cursor: auto !important; }
+.cursor {
+  position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none;
+  width: 14px; height: 14px; border-radius: 50%; background: #fff; mix-blend-mode: difference;
+  display: grid; place-items: center; opacity: 0;
+  transition: width .4s var(--ease), height .4s var(--ease), opacity .25s var(--ease);
+}
+.cursor.is-visible { opacity: 1; }
+.cursor.is-link { width: 46px; height: 46px; }
+.cursor.is-label { width: 86px; height: 86px; }
+.cursor-label { font: 700 12px/1 var(--font-text); letter-spacing: .08em; text-transform: uppercase; color: #000; opacity: 0; transition: opacity .2s; white-space: nowrap; }
+.cursor.is-label .cursor-label { opacity: 1; }
+
 /* ---------- Адаптивність ---------- */
 
 @media (max-width: 1100px) {
@@ -769,7 +855,8 @@ body:has(.mini-player:not([hidden])) .site-footer { padding-bottom: calc(110px +
   .phil-head { grid-template-columns: 1fr; }
   .phil-grid { grid-template-columns: 1fr; }
   .phil-item { min-height: 0; }
-  .timeline::before { left: 19px; }
+  .timeline::before, .timeline::after { left: 19px; }
+  .steps::after { top: 10px; bottom: 10px; left: 9px; right: auto; width: 2px; height: auto; background: linear-gradient(var(--pink), var(--cyan)); transform-origin: 50% 0; transform: scaleY(var(--steps-p, 1)); }
   .tl-item { grid-template-columns: 1fr; padding-left: 58px; }
   .tl-item:nth-child(even) .tl-media { order: 0; }
   .tl-num { width: 40px; height: 40px; font-size: 15px; }
@@ -839,6 +926,8 @@ body:has(.mini-player:not([hidden])) .site-footer { padding-bottom: calc(110px +
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   .menu-links a { transform: none; }
+  .menu, .menu.is-open { clip-path: none; }
+  .btn { translate: none; }
   /* Без нахилів, збільшень і зміщень — лише зміна кольору й прозорості */
   .btn, .chip, .track-play, .mini-btn, .mini-close, .svc-card, .glass-card, .bento-card,
   .btn:hover, .btn:active, .chip:hover, .chip:active, .track-play:hover, .track-play:active, .mini-btn:hover, .mini-close:hover,

@@ -101,7 +101,9 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter+Tight:wght@800;900&family=Inter:wght@400;500;600;700&display=swap">
-  <script>document.documentElement.classList.add('js')</script>
+  <!-- js — сторінку обслуговує JavaScript; wr-anim — стартові приховані стани анімацій (site.css).
+       Якщо motion.js за 4 с не запустився, wr-anim знімається і весь вміст видно. -->
+  <script>(function(d){d.classList.add('js','wr-anim');setTimeout(function(){if(!(window.wrMotion&&window.wrMotion.ready))d.classList.remove('wr-anim')},4000)})(document.documentElement)</script>
   <link rel="stylesheet" href="${asset('vendor/lenis-1.3.27.css')}">
   <link rel="stylesheet" href="${asset('css/site.css')}">
   ${analyticsHead(s)}

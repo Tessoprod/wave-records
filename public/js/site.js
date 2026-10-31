@@ -96,13 +96,17 @@
     toggle.setAttribute('aria-expanded', String(open));
     $('.menu-label', toggle).textContent = open ? 'Закрити' : 'Меню';
     document.body.classList.toggle('menu-open', open);
+    // Меню розкривається колом із центру кнопки (clip-path у site.css)
+    const r = toggle.getBoundingClientRect();
+    menu.style.setProperty('--menu-x', `${Math.round(r.left + r.width / 2)}px`);
+    menu.style.setProperty('--menu-y', `${Math.round(r.top + r.height / 2)}px`);
     if (open) {
       menu.hidden = false;
       requestAnimationFrame(() => requestAnimationFrame(() => menu.classList.add('is-open')));
       setTimeout(() => $('a', menu)?.focus({ preventScroll: true }), 80);
     } else {
       menu.classList.remove('is-open');
-      setTimeout(() => { if (!menu.classList.contains('is-open')) menu.hidden = true; }, reduceMotion ? 0 : 360);
+      setTimeout(() => { if (!menu.classList.contains('is-open')) menu.hidden = true; }, reduceMotion ? 0 : 620);
     }
   }
   toggle?.addEventListener('click', () => setMenu(toggle.getAttribute('aria-expanded') !== 'true'));
