@@ -36,25 +36,22 @@
   /* Висота зони шапки разом із «чубчиком» iPhone (safe-area зверху) */
   --header-h: calc(76px + env(safe-area-inset-top, 0px));
 
-  /* Рідке скло: одна система для всіх скляних елементів (клас .glass).
-     Край скла задає світло, а не рамка: відблиск зверху, світлове ребро (--glass-rim) і заломлення. */
-  --glass-fill: linear-gradient(180deg, rgba(255, 255, 255, .07) 0%, rgba(255, 255, 255, .018) 100%), rgba(14, 14, 16, .16);
-  --glass-fill-hover: linear-gradient(180deg, rgba(255, 255, 255, .1) 0%, rgba(255, 255, 255, .03) 100%), rgba(14, 14, 16, .12);
+  /* Рідке скло: одна система для всіх скляних елементів (клас .glass) */
+  --glass-fill: linear-gradient(180deg, rgba(255, 255, 255, .075) 0%, rgba(255, 255, 255, .025) 100%);
+  --glass-fill-hover: linear-gradient(180deg, rgba(255, 255, 255, .11) 0%, rgba(255, 255, 255, .04) 100%);
+  --glass-edge: rgba(255, 255, 255, .16);
+  --glass-edge-hover: rgba(255, 255, 255, .3);
   --glass-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, .2),
-    inset 0 16px 24px -20px rgba(255, 255, 255, .22),
-    inset 0 -14px 22px -18px rgba(255, 255, 255, .08),
-    0 14px 34px -12px rgba(0, 0, 0, .5);
+    inset 0 1px 0 rgba(255, 255, 255, .22),
+    inset 0 -1px 0 rgba(255, 255, 255, .04),
+    0 10px 30px -10px rgba(0, 0, 0, .45);
   --glass-shadow-hover:
-    inset 0 1px 1px rgba(255, 255, 255, .3),
-    inset 0 18px 28px -20px rgba(255, 255, 255, .3),
-    inset 0 -14px 22px -18px rgba(255, 255, 255, .12),
+    inset 0 1px 0 rgba(255, 255, 255, .34),
+    inset 0 -1px 0 rgba(255, 255, 255, .06),
     0 26px 56px -16px rgba(0, 0, 0, .65);
-  /* Розмиття там, де справжнього заломлення немає (Safari, Firefox, телефони) */
-  --glass-blur: blur(18px);
+  --glass-blur: blur(20px) saturate(175%);
   --glass-sheen: rgba(255, 255, 255, .055);
-  /* Світлове ребро: яскраве зверху зліва, ледь помітне з боків, відбите світло знизу справа */
-  --glass-rim: linear-gradient(160deg, rgba(255, 255, 255, .42) 0%, rgba(255, 255, 255, .1) 14%, rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, .03) 86%, rgba(255, 255, 255, .09) 100%);
+  --glass-rim: rgba(255, 255, 255, 1);
 
   --ease: cubic-bezier(.2, .8, .2, 1);
   --ease-spring: cubic-bezier(.34, 1.4, .64, 1);
@@ -143,27 +140,20 @@ h1, h2, h3, h4 { margin: 0; }
 .bg-grain { position: absolute; inset: 0; opacity: .045; background-size: 140px 140px; mix-blend-mode: overlay; }
 
 /* ---------- Liquid glass ----------
-   .glass — спільний клас скла (.btn-glass — його варіант для кнопок). Рамок немає: край видно завдяки світлу.
+   .glass — спільний клас скла (.btn-glass — його варіант для кнопок).
    ::before — смуга світла всередині скла; зміщується від прокрутки (--sy, для кожного блоку)
               і положення курсора (--px, на <html>). Обидві змінні оновлює site.js через requestAnimationFrame.
-   ::after  — світлове ребро по краю (маска лишає тільки вузьку смугу): статичне світло --glass-rim
-              плюс відблиск там, де курсор (--mx/--my, яскравість --rim-hot).
-   --lg     — Chromium на комп'ютері: site.js ставить url(#lgN) — SVG-фільтр заломлення під розмір блоку
-              (лінза з фаскою: сильне зміщення біля країв, нуль у центрі, канали R, G, B зміщуються по-різному).
-              Без нього лишається звичайне розмиття --glass-blur. --lg-tone — насиченість/яскравість після нього.
-   Призма — тонке райдужне ребро, що обертається від прокрутки й курсора; у Safari, Firefox і на телефонах
-              (без справжнього заломлення) воно яскравіше. */
-
-@property --rim-hot { syntax: '<number>'; inherits: false; initial-value: 0; }
+   ::after  — відблиск по краю скла там, де курсор (--mx/--my); маска лишає тільки рамку.
+   html.lg-refract — Chromium: додаткове заломлення через SVG-фільтр #lg-refract. */
 
 .glass, .btn-glass {
   position: relative;
   isolation: isolate;
   overflow: hidden;
   background: var(--glass-fill);
-  -webkit-backdrop-filter: var(--glass-blur) var(--lg-tone, saturate(175%));
-  backdrop-filter: var(--lg, var(--glass-blur)) var(--lg-tone, saturate(175%));
-  border: 1px solid transparent;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-edge);
   box-shadow: var(--glass-shadow);
 }
 .glass::before, .btn-glass::before {
@@ -181,41 +171,27 @@ h1, h2, h3, h4 { margin: 0; }
   border-radius: inherit;
   padding: 1.5px;
   pointer-events: none;
-  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 0%), #fff, rgba(255, 255, 255, .35) 30%, transparent 75%);
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 0%), var(--glass-rim), rgba(255, 255, 255, .35) 30%, transparent 75%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
   opacity: 0;
   transition: opacity .35s var(--ease);
 }
-/* Скло: ребро світиться завжди, курсор лише підсвічує його. Поверх білого світла — райдужний шар призми:
-   його кут залежить від прокрутки (--sy) і курсора (--px). Там, де є справжнє заломлення (html.lg-refract),
-   райдугу дає SVG-фільтр, тож цей шар слабший (--prism). */
-.glass::after, .btn-glass::after, .track-play::after {
-  padding: 1.5px;
-  opacity: 1;
-  mix-blend-mode: screen;
-  background:
-    radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, calc(var(--rim-hot) * .95)), rgba(255, 255, 255, calc(var(--rim-hot) * .3)) 32%, transparent 72%),
-    var(--glass-rim),
-    conic-gradient(from calc(200deg + var(--sy, 0) * 110deg + var(--px, 0) * 60deg),
-      rgba(var(--pink-rgb), calc(var(--prism) * .32)), rgba(160, 90, 255, calc(var(--prism) * .26)), rgba(var(--cyan-rgb), calc(var(--prism) * .22)),
-      rgba(245, 245, 245, calc(var(--prism) * .12)), rgba(var(--cyan-rgb), calc(var(--prism) * .16)), rgba(160, 90, 255, calc(var(--prism) * .22)), rgba(var(--pink-rgb), calc(var(--prism) * .32)));
-  transition: --rim-hot .35s var(--ease);
+html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn-glass {
+  -webkit-backdrop-filter: url(#lg-refract) var(--glass-blur);
+  backdrop-filter: url(#lg-refract) var(--glass-blur);
 }
-:root { --prism: 1; }
-html.lg-refract { --prism: .6; }
 .lg-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 
 /* Блоки, що нахиляються до курсора і збільшуються (кути --rx/--ry ставить site.js) */
 .svc-card, .glass-card, .bento-card {
   transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-  transition: transform .38s var(--ease-spring), box-shadow .38s var(--ease);
+  transition: transform .38s var(--ease-spring), box-shadow .38s var(--ease), border-color .38s var(--ease);
 }
 @media (hover: hover) and (pointer: fine) {
-  .glass:hover, .btn-glass:hover { background: var(--glass-fill-hover); }
-  .glass:hover::after, .btn-glass:hover::after, .track-play:hover::after { --rim-hot: 1; }
-  .btn-neon:hover::after { opacity: 1; }
+  .glass:hover, .btn-glass:hover { border-color: var(--glass-edge-hover); background: var(--glass-fill-hover); }
+  .glass:hover::after, .btn-glass:hover::after, .btn-neon:hover::after, .track-play:hover::after { opacity: 1; }
   .svc-card:hover, .glass-card:hover, .bento-card:hover {
     transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.025);
     box-shadow: var(--glass-shadow-hover);
@@ -297,23 +273,21 @@ html.lg-refract { --prism: .6; }
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 10px 0 18px;
   border-radius: var(--r-pill);
-  /* Під шапкою пропливає текст сторінки — розмиття сильніше, щоб логотип і кнопки читалися */
-  --lg-blur: 9;
-  transition: background .4s var(--ease), box-shadow .4s var(--ease);
+  transition: background .4s var(--ease), border-color .4s var(--ease), box-shadow .4s var(--ease), backdrop-filter .4s var(--ease), -webkit-backdrop-filter .4s var(--ease);
 }
-/* На самому верху — легке скло; край видно завдяки світловому ребру (яскравіше, ніж у карток), при прокрутці — щільніше */
+/* На самому верху — легке скло з тонким контуром, при прокрутці — щільніше */
 .site-header.glass:not([data-scrolled]) {
-  --glass-rim: linear-gradient(180deg, rgba(255, 255, 255, .4) 0%, rgba(255, 255, 255, .1) 28%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, .03) 75%, rgba(255, 255, 255, .1) 100%);
-  background: linear-gradient(180deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .012));
+  background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .01));
   -webkit-backdrop-filter: blur(8px) saturate(140%);
-  backdrop-filter: var(--lg, blur(8px)) saturate(140%);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .14), inset 0 12px 20px -16px rgba(255, 255, 255, .16), 0 10px 26px -16px rgba(0, 0, 0, .45);
+  backdrop-filter: blur(8px) saturate(140%);
+  border-color: rgba(255, 255, 255, .12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
 }
 .site-header[data-scrolled] {
-  background: linear-gradient(180deg, rgba(30, 30, 30, .56), rgba(20, 20, 20, .46));
+  background: linear-gradient(180deg, rgba(30, 30, 30, .5), rgba(20, 20, 20, .38));
   box-shadow: var(--glass-shadow);
 }
-.site-header:hover::after { --rim-hot: .6; }
+.site-header:hover::after { opacity: .6; }
 .logo { display: inline-flex; align-items: center; min-height: 44px; gap: 10px; text-decoration: none; font-family: var(--font-display); font-size: 20px; letter-spacing: -.01em; line-height: 1; }
 .logo-box { position: relative; display: block; }
 .logo-img { display: block; height: 36px; width: auto; max-width: 100%; }
@@ -359,9 +333,8 @@ html.lg-refract { --prism: .6; }
   /* Те саме скло, лише щільніше: меню закриває всю сторінку, текст має читатися */
   background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015)), rgba(12, 12, 12, .6);
   -webkit-backdrop-filter: blur(30px) saturate(175%);
-  backdrop-filter: var(--lg, blur(30px)) saturate(175%);
-  --lg-blur: 14;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .1), inset 0 40px 60px -50px rgba(255, 255, 255, .12);
+  backdrop-filter: blur(30px) saturate(175%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1);
   overflow-y: auto;
   opacity: 0;
   transition: opacity .35s var(--ease);
@@ -462,15 +435,15 @@ main { display: block; }
   display: grid; place-items: center;
   cursor: pointer;
   background: var(--glass-fill);
-  -webkit-backdrop-filter: var(--glass-blur) saturate(175%);
-  backdrop-filter: var(--lg, var(--glass-blur)) saturate(175%);
-  border: 0;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-edge);
   box-shadow: var(--glass-shadow);
   overflow: hidden;
-  transition: transform .35s var(--ease-spring), background-color .25s;
+  transition: transform .35s var(--ease-spring), background-color .25s, border-color .25s;
 }
 @media (hover: hover) and (pointer: fine) {
-  .track-play:hover { transform: scale(1.07); }
+  .track-play:hover { transform: scale(1.07); border-color: var(--glass-edge-hover); }
   .mini-btn:hover, .mini-close:hover { transform: scale(1.08); }
 }
 .track-play:active { transform: scale(.92); transition-duration: .12s; }
@@ -478,7 +451,7 @@ main { display: block; }
 .track-play .i-pause, .mini-btn .i-pause { display: none; }
 .is-playing .track-play .i-play, .mini-player.is-playing .mini-btn .i-play { display: none; }
 .is-playing .track-play .i-pause, .mini-player.is-playing .mini-btn .i-pause { display: block; }
-.track.is-active .track-play { background: linear-gradient(180deg, #7ff2ff, var(--cyan)); color: var(--black); }
+.track.is-active .track-play { background: linear-gradient(180deg, #7ff2ff, var(--cyan)); color: var(--black); border-color: rgba(var(--cyan-rgb), .6); }
 .track-body { min-width: 0; display: grid; grid-template-columns: minmax(180px, 2fr) minmax(0, 3fr); align-items: center; gap: 8px 28px; }
 .track-title { font-size: clamp(16px, 1.4vw, 19px); line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .track-dash { color: var(--ink-3); }
@@ -735,7 +708,6 @@ main { display: block; }
   border-radius: var(--r-pill);
   /* Скло трохи щільніше: плеєр висить над будь-яким вмістом сторінки */
   background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03)), rgba(16, 16, 16, .45);
-  --lg-blur: 9;
   animation: rise .5s var(--ease-spring);
 }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, 24px); } }
@@ -754,7 +726,7 @@ body:has(.mini-player:not([hidden])) .site-footer { padding-bottom: calc(110px +
 
 /* ---------- Cookies ---------- */
 
-.consent { --lg-blur: 9; position: fixed; z-index: 60; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: min(440px, 100% - 32px); padding: 20px; border-radius: var(--r-lg); background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03)), rgba(16, 16, 16, .5); font-size: 15px; color: var(--ink-2); }
+.consent { position: fixed; z-index: 60; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: min(440px, 100% - 32px); padding: 20px; border-radius: var(--r-lg); background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03)), rgba(16, 16, 16, .5); font-size: 15px; color: var(--ink-2); }
 .consent a { color: var(--white); }
 .consent-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 
@@ -836,8 +808,7 @@ body:has(.mini-player:not([hidden])) .site-footer { padding-bottom: calc(110px +
   .footer-bottom { align-items: center; }
   .footer-grid a::after, .footer-legal a::after, .footer-legal .link-btn::after, .menu-meta a::after { bottom: 9px; }
   /* Легше скло: менше розмиття — менше роботи для телефона */
-  :root { --glass-blur: blur(12px); }
-  .glass::before, .btn-glass::before { transform: none; }
+  :root { --glass-blur: blur(12px) saturate(150%); }
   .menu { -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%); background: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .01)), rgba(12, 12, 12, .78); }
 }
 
