@@ -19,7 +19,9 @@ const wide = matchMedia('(min-width: 861px)').matches;
 
 const EASE = 'expo.out';
 const SOFT = 'power3.out';
-const motion = window.wrMotion = { gsap, ScrollTrigger, SplitText, lenis: null, reduceMotion, hero: null, stepMood: null, ready: false };
+const motion = window.wrMotion = { gsap, ScrollTrigger, SplitText, lenis: null, reduceMotion, hero: null, heroReady: null, introDone: Promise.resolve(), stepMood: null, ready: false };
+// Сторінку відкрито через View Transition: заголовок уже перетік на місце, повторно його не анімуємо
+const cameByTransition = () => root.classList.contains('vt-in');
 
 /* ---------- Плавний скрол ---------- */
 function smoothScroll() {
@@ -80,7 +82,7 @@ function cascade(items, { y = 40, x = 0, stagger = 0.08, onEnter } = {}) {
 
 /* ---------- 1. Заголовки й тексти ---------- */
 function headings() {
-  $$('main .h1, main .h2').filter(notInDialog).forEach((el) => {
+  $$('main .h1, main .h2').filter(notInDialog).filter((el) => !(el.tagName === 'H1' && cameByTransition())).forEach((el) => {
     if (reduceMotion || !SplitText) {
       gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: SOFT, scrollTrigger: onceAt(el, 'top 92%') });
       return;
@@ -311,13 +313,119 @@ function menuRoll() {
   });
 }
 
+/* ---------- Інтро при першому вході в сесії ----------
+   Логотип із 12 смужок грає, як еквалайзер, смужки стискаються в лінію, лінія стає хвилею,
+   а потім розкривається — дві темні половини роз'їжджаються і відкривають перший екран.
+   Лічильник 0–100 показує справжнє завантаження: шрифти і (на головній) three.js зі сценою.
+   Прелоадер триває не довше 2 с; «Пропустити», будь-який клік чи Esc закривають інтро одразу. */
+function intro() {
+  const el = document.querySelector('[data-intro]');
+  if (!el || !root.classList.contains('wr-intro')) { el?.remove(); return Promise.resolve(); }
+  el.style.animation = 'none'; // CSS-запобіжник більше не потрібен
+  motion.lenis?.stop();
+  const logoImg = el.querySelector('.logo-img');
+  const logoBars = el.querySelector('.logo-bars');
+  const bars = $$('.logo-bars i', el);
+  const line = el.querySelector('.intro-line');
+  const path = line.querySelector('path');
+  const count = el.querySelector('.intro-count');
+  const halves = [el.querySelector('.intro-top'), el.querySelector('.intro-bottom')];
+
+  // Що вантажимо насправді
+  const tasks = [document.fonts ? document.fonts.ready : Promise.resolve()];
+  if (motion.heroReady) tasks.push(motion.heroReady);
+  let loaded = 0;
+  tasks.forEach((p) => p.then(() => { loaded++; }, () => { loaded++; }));
+
+  // Лінія-хвиля: синусоїда з обвідною, амплітуда a (0 — пряма лінія)
+  const wave = { a: 0, ph: 0 };
+  const drawWave = () => {
+    let d = '';
+    for (let i = 0; i <= 60; i++) {
+      const x = (i / 60) * 1000;
+      const env = Math.sin((Math.PI * i) / 60);
+      const y = 100 + wave.a * 70 * env * Math.sin(i * 0.42 + wave.ph);
+      d += `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+    }
+    path.setAttribute('d', d);
+  };
+
+  gsap.set(logoImg, { opacity: 0 });
+  gsap.set(logoBars, { opacity: 1 });
+  gsap.set(bars, { transformOrigin: '50% 50%' });
+  const t0 = performance.now();
+  const shown = { v: 0 };
+  const eq = gsap.timeline();
+  eq.from(logoBars, { opacity: 0, scale: 0.94, duration: 0.4, ease: SOFT })
+    .to(bars, { scaleY: () => gsap.utils.random(0.3, 1.35), duration: 0.16, ease: 'sine.inOut', repeat: 7, yoyo: true, stagger: { each: 0.02, from: 'random' } }, 0.25);
+
+  return new Promise((resolve) => {
+    let closing = false;
+    const counter = () => {
+      // Поки задача вантажиться, лічильник повзе до наступної позначки, але не перескакує її
+      const elapsed = (performance.now() - t0) / 1000;
+      const part = loaded < tasks.length ? Math.min(0.85, elapsed / 1.3) : 0;
+      const target = ((loaded + part) / tasks.length) * 100;
+      shown.v += (target - shown.v) * 0.15;
+      count.textContent = String(Math.min(100, Math.round(shown.v)));
+    };
+    gsap.ticker.add(counter);
+
+    const finish = (fast = false) => {
+      if (closing) return;
+      closing = true;
+      gsap.ticker.remove(counter);
+      eq.kill();
+      cleanupInput();
+      const tl = gsap.timeline({
+        onComplete: () => {
+          root.classList.remove('wr-intro');
+          el.remove();
+          motion.lenis?.start();
+          resolve();
+        },
+      });
+      tl.to(shown, { v: 100, duration: fast ? 0.15 : 0.35, ease: SOFT, onUpdate: () => { count.textContent = String(Math.round(shown.v)); } }, 0);
+      if (!fast) {
+        // Смужки стискаються в лінію, лінія вигинається хвилею і знову випрямляється
+        tl.to(bars, { scaleY: 0.03, duration: 0.3, ease: 'power3.in', stagger: { each: 0.012, from: 'center' } }, 0)
+          .to(logoBars, { opacity: 0, duration: 0.2 }, 0.22)
+          .fromTo(line, { opacity: 0, scaleX: 0.2 }, { opacity: 1, scaleX: 1, duration: 0.35, ease: SOFT }, 0.2)
+          .to(wave, { a: 1, ph: 3, duration: 0.3, ease: 'sine.out', onUpdate: drawWave }, 0.35)
+          .to(wave, { a: 0, ph: 5, duration: 0.25, ease: 'sine.in', onUpdate: drawWave }, 0.65);
+      }
+      // Лінія розкривається: половини роз'їжджаються, відкриваючи перший екран
+      const at = fast ? 0.05 : 0.88;
+      tl.to(count, { opacity: 0, duration: 0.25 }, at - 0.1)
+        .to(el.querySelector('.intro-skip'), { opacity: 0, duration: 0.2 }, at - 0.1)
+        .to(halves[0], { yPercent: -100, duration: fast ? 0.55 : 0.9, ease: 'expo.inOut' }, at)
+        .to(halves[1], { yPercent: 100, duration: fast ? 0.55 : 0.9, ease: 'expo.inOut' }, at)
+        .to(line, { opacity: 0, scaleY: 3, duration: 0.5, ease: SOFT }, at + 0.1)
+        .to(el.querySelector('.intro-logo'), { opacity: 0, duration: 0.2 }, at);
+    };
+
+    // Прелоадер: щонайменше ~0,9 с (щоб еквалайзер встиг зіграти), щонайбільше 2 с
+    Promise.all(tasks.map((p) => p.catch(() => {}))).then(() => {
+      const wait = Math.max(0, 900 - (performance.now() - t0));
+      setTimeout(() => finish(), wait);
+    });
+    setTimeout(() => finish(), 2000);
+
+    const skip = () => finish(true);
+    const onKey = (e) => { if (e.key === 'Escape') skip(); };
+    el.addEventListener('click', skip);
+    addEventListener('keydown', onKey);
+    const cleanupInput = () => { el.removeEventListener('click', skip); removeEventListener('keydown', onKey); };
+  });
+}
+
 /* Поява заголовка першого екрана: літери WAVE RECORDS виїжджають знизу, далі підзаголовок і кнопки.
    До початку анімації текст схований (html.js у site.css); без анімацій — просто показуємо. */
 function heroIntro() {
   const intro = document.querySelector('[data-hero-intro]');
   if (!intro) return;
   const show = () => intro.classList.add('is-in');
-  if (!gsap || reduceMotion) { show(); return; }
+  if (!gsap || reduceMotion || cameByTransition()) { show(); return; }
   const line1 = intro.querySelector('.hero-l1');
   const rest = intro.querySelectorAll('.hero-l2, .hero-sub, .hero-ctas');
   const run = () => {
@@ -328,8 +436,8 @@ function heroIntro() {
     else if (line1) tl.from(line1, { y: 40, opacity: 0, duration: 1.1 });
     tl.from(rest, { y: 28, opacity: 0, duration: 1, stagger: 0.1 }, split ? 0.35 : 0.2);
   };
-  // Літери ділимо після завантаження шрифтів, інакше їхня ширина буде хибною
-  (document.fonts ? document.fonts.ready : Promise.resolve()).then(run);
+  // Літери ділимо після завантаження шрифтів (інакше їхня ширина буде хибною) і після інтро
+  Promise.all([document.fonts ? document.fonts.ready : null, motion.introDone]).then(run);
 }
 
 /* 3D-скульптура (public/js/hero3d.js): на першому екрані, а на комп'ютері ще й у секції «Як це працює».
@@ -401,11 +509,17 @@ async function heroScene() {
 }
 
 /* ---------- Запуск ---------- */
-function showAll() { root.classList.remove('wr-anim'); }
+function showAll() {
+  root.classList.remove('wr-anim', 'wr-intro');
+  document.querySelector('[data-intro]')?.remove();
+}
 try {
   if (!gsap || !ScrollTrigger) throw new Error('GSAP не завантажився');
   gsap.registerPlugin(...[ScrollTrigger, SplitText].filter(Boolean));
   smoothScroll();
+  // Під час інтро 3D-сцена вантажиться одразу — лічильник показує саме її завантаження
+  if (root.classList.contains('wr-intro') && document.querySelector('[data-hero-scene]')) motion.heroReady = heroScene();
+  motion.introDone = intro();
   heroIntro();
   // Кроки — першими: закріплення змінює позиції всіх наступних тригерів
   steps();
@@ -421,6 +535,7 @@ try {
     ScrollTrigger.sort();
     ScrollTrigger.refresh();
   });
+  motion.introDone.then(() => ScrollTrigger.refresh());
   motion.ready = true;
 } catch (err) {
   console.error('Анімації вимкнено:', err);
@@ -434,5 +549,5 @@ const afterPaint = (fn) => {
   const go = () => ('requestIdleCallback' in window ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 200));
   if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });
 };
-afterPaint(heroScene);
+if (!motion.heroReady) afterPaint(heroScene);
 if (ScrollTrigger) addEventListener('load', () => ScrollTrigger.refresh());

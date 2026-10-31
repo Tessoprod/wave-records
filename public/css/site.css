@@ -833,6 +833,83 @@ html.has-cursor :is(input, textarea, select, iframe, [contenteditable="true"]) {
 .cursor-label { font: 700 12px/1 var(--font-text); letter-spacing: .08em; text-transform: uppercase; color: #000; opacity: 0; transition: opacity .2s; white-space: nowrap; }
 .cursor.is-label .cursor-label { opacity: 1; }
 
+/* ---------- Інтро при першому вході (анімацію веде motion.js) ----------
+   Видно лише з html.wr-intro: клас ставить скрипт у <head> раз на сесію і не ставить при prefers-reduced-motion.
+   Без JS інтро немає. Якщо motion.js не підхопив інтро, воно саме зникає через 3,2 с. */
+.intro { display: none; }
+html.wr-intro .intro {
+  display: block; position: fixed; inset: 0; z-index: 200; cursor: pointer;
+  animation: intro-failsafe .4s 3.2s forwards;
+}
+@keyframes intro-failsafe { to { opacity: 0; visibility: hidden; } }
+.intro-half { position: absolute; left: 0; right: 0; height: 50.5%; background: var(--black); will-change: transform; }
+.intro-top { top: 0; }
+.intro-bottom { bottom: 0; }
+.intro-stage { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.intro-logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.intro-logo .logo-img { height: clamp(56px, 9vw, 96px); }
+.intro-logo .logo-bars { opacity: 0; }
+.intro-line { position: absolute; left: 0; top: 50%; width: 100%; height: 160px; margin-top: -80px; overflow: visible; opacity: 0; }
+.intro-line path { filter: drop-shadow(0 0 6px rgba(var(--pink-rgb), .35)); }
+.intro-count {
+  position: absolute; right: var(--gutter); bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  font-family: var(--font-display); font-size: clamp(44px, 7vw, 96px); line-height: 1; letter-spacing: -.02em;
+  color: transparent; -webkit-text-stroke: 1px rgba(245, 245, 245, .4); font-variant-numeric: tabular-nums;
+}
+.intro-skip {
+  position: absolute; left: var(--gutter); bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  min-height: 44px; padding: 0 4px; border: 0; background: none; color: var(--ink-2);
+  font: 600 13px/1 var(--font-text); letter-spacing: .12em; text-transform: uppercase; cursor: pointer;
+}
+.intro-skip:hover { color: var(--white); }
+
+/* ---------- Переходи між сторінками (cross-document View Transitions) ----------
+   Шапка лишається на місці, заголовок сторінки перетікає в новий, старий вміст іде вгору із затемненням,
+   новий проявляється знизу, а по екрану проходить коротка неонова шторка (.vt-curtain у layout.js).
+   Браузери без підтримки просто відкривають нову сторінку. Працює однаково в підпапці GitHub Pages
+   і на власному домені — переходи в межах одного сайту. */
+@view-transition { navigation: auto; }
+.site-header { view-transition-name: site-header; }
+main h1 { view-transition-name: page-title; }
+.vt-curtain { position: fixed; inset: 0; z-index: -2; pointer-events: none; opacity: 0; view-transition-name: vt-curtain; }
+
+::view-transition-group(root) { animation-duration: .8s; }
+::view-transition-old(root) { animation: vt-out .55s cubic-bezier(.7, 0, .84, 0) both; }
+::view-transition-new(root) { animation: vt-in .8s cubic-bezier(.16, 1, .3, 1) .2s both; }
+@keyframes vt-out { to { transform: translateY(-6vh); opacity: 0; filter: brightness(.35); } }
+@keyframes vt-in { from { transform: translateY(6vh); opacity: 0; } }
+
+/* Шапка — нерухома */
+::view-transition-group(site-header) { animation: none; z-index: 3; }
+::view-transition-old(site-header) { display: none; }
+::view-transition-new(site-header) { animation: none; }
+
+/* Заголовок перетікає зі старого місця в нове */
+::view-transition-group(page-title) { animation-duration: .7s; animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+
+/* Неонова шторка: рожево-ціанова смуга проходить знизу вгору */
+/* Знімок самого елемента порожній — смугу малює фон групи переходу */
+::view-transition-group(vt-curtain) {
+  z-index: 2;
+  animation: vt-curtain .8s cubic-bezier(.65, 0, .35, 1) both;
+  background: linear-gradient(180deg, transparent 0%, rgba(var(--pink-rgb), 0) 25%, rgba(var(--pink-rgb), .32) 44%, rgba(var(--cyan-rgb), .28) 56%, rgba(var(--cyan-rgb), 0) 75%, transparent 100%);
+  mix-blend-mode: screen;
+}
+::view-transition-old(vt-curtain), ::view-transition-new(vt-curtain) { display: none; }
+@keyframes vt-curtain { from { transform: translateY(100%); } to { transform: translateY(-100%); } }
+
+/* Прийшли через перехід — заголовок уже на місці, повторна поява не потрібна */
+html.vt-in main h1, html.vt-in [data-hero-intro] { opacity: 1 !important; animation: none; }
+
+/* Без руху — лише коротке проявлення */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  ::view-transition-old(root) { animation: vt-fade .25s reverse both !important; }
+  ::view-transition-new(root) { animation: vt-fade .25s both !important; }
+  ::view-transition-group(vt-curtain) { display: none; }
+}
+@keyframes vt-fade { from { opacity: 0; } }
+
 /* ---------- Адаптивність ---------- */
 
 @media (max-width: 1100px) {

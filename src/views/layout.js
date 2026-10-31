@@ -101,15 +101,31 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter+Tight:wght@800;900&family=Inter:wght@400;500;600;700&display=swap">
-  <!-- js — сторінку обслуговує JavaScript; wr-anim — стартові приховані стани анімацій (site.css).
-       Якщо motion.js за 4 с не запустився, wr-anim знімається і весь вміст видно. -->
-  <script>(function(d){d.classList.add('js','wr-anim');setTimeout(function(){if(!(window.wrMotion&&window.wrMotion.ready))d.classList.remove('wr-anim')},4000)})(document.documentElement)</script>
+  <!-- js — сторінку обслуговує JavaScript; wr-anim — стартові приховані стани анімацій (site.css);
+       wr-intro — інтро при першому вході в цій сесії (не з prefers-reduced-motion);
+       vt-in — сторінку відкрито через View Transition (заголовок уже на місці, без повторної появи).
+       Якщо motion.js за 4 с не запустився, wr-anim і wr-intro знімаються і весь вміст видно. -->
+  <script>(function(d){d.classList.add('js','wr-anim');try{if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&!sessionStorage.getItem('wr_intro')){d.classList.add('wr-intro');sessionStorage.setItem('wr_intro','1')}}catch(e){}addEventListener('pagereveal',function(e){if(e.viewTransition)d.classList.add('vt-in')});setTimeout(function(){if(!(window.wrMotion&&window.wrMotion.ready))d.classList.remove('wr-anim','wr-intro')},4000)})(document.documentElement)</script>
   <link rel="stylesheet" href="${asset('vendor/lenis-1.3.27.css')}">
   <link rel="stylesheet" href="${asset('css/site.css')}">
   ${analyticsHead(s)}
 </head>
 <body class="${bodyClass}">
   ${analyticsBody(s)}
+  <!-- Інтро: показується лише з html.wr-intro (див. скрипт у <head>), анімацію веде motion.js -->
+  <div class="intro" data-intro>
+    <div class="intro-half intro-top" aria-hidden="true"></div>
+    <div class="intro-half intro-bottom" aria-hidden="true"></div>
+    <div class="intro-stage" aria-hidden="true">
+      <span class="intro-logo">${logoMark()}</span>
+      <svg class="intro-line" viewBox="0 0 1000 200" preserveAspectRatio="none" focusable="false">
+        <defs><linearGradient id="intro-grad" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#FF2E9A" stop-opacity="0"/><stop offset=".3" stop-color="#FF2E9A"/><stop offset=".7" stop-color="#00E5FF"/><stop offset="1" stop-color="#00E5FF" stop-opacity="0"/></linearGradient></defs>
+        <path d="M0 100 L1000 100" stroke="url(#intro-grad)" stroke-width="2" fill="none" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <span class="intro-count">0</span>
+    </div>
+    <button type="button" class="intro-skip" data-intro-skip>Пропустити</button>
+  </div>
   <a class="skip" href="#main">Перейти до вмісту</a>
   <div class="bg" data-bg aria-hidden="true"><div class="bg-dots"></div><canvas></canvas><div class="bg-grain"></div></div>
 
@@ -186,6 +202,9 @@ export function layout({ title, description, path: current = '/', body, bodyClas
       <button type="button" class="btn btn-sm btn-light" data-consent-choice="all">Прийняти всі</button>
     </div>
   </div>
+
+  <!-- Неонова шторка для переходів між сторінками (View Transitions, site.css) -->
+  <div class="vt-curtain" aria-hidden="true"></div>
 
   <script src="${asset('js/bg.js')}" defer></script>
   <script src="${asset('js/site.js')}" defer></script>
