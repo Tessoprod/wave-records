@@ -310,9 +310,10 @@
     if (!analyser || audio.paused) { window.wrAudioLevel = null; return; }
     analyser.getByteFrequencyData(freq);
     const bins = freq.length * 0.7;
-    // Рівень звуку для фону (bg.js) і 3D-скульптури (hero3d.js): низькі й середні частоти, від 0 до 1
+    // Рівень звуку для фону (bg.js) і 3D-хвилі (hero3d.js): низькі й середні частоти від 0 до 1,
+    // а також увесь спектр (freq, 0…255) — за ним гребінь хвилі повторює музику вздовж своєї довжини
     const avg = (from, to) => { let s = 0; for (let i = from; i < to; i++) s += freq[i]; return s / (to - from) / 255; };
-    window.wrAudioLevel = { bass: avg(1, 8), mid: avg(8, 48) };
+    window.wrAudioLevel = { bass: avg(1, 8), mid: avg(8, 48), freq };
     for (const m of meters) {
       if (!m.visible) continue;
       const n = m.bars.length;

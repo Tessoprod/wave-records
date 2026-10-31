@@ -132,13 +132,14 @@ function blocks() {
 }
 
 /* ---------- Як це працює: кроки підсвічуються по черзі, лінія заповнюється ---------- */
-// Настрій скульптури на кожному кроці; на «Записуємо» вона хвилюється найсильніше
+// Настрій 3D-хвилі на кожному кроці (x, y — зсув у частках півширини/піввисоти кадру, scale — масштаб);
+// на «Записуємо» гребінь колишеться найсильніше і бризок найбільше
 const STEP_MOODS = [
-  { amp: 0.7, spin: 0.1, x: 1.8, y: 0.85, scale: 0.5 },
-  { amp: 0.95, detail: 0.15, spin: 0.3, x: 1.8, y: 0.85, scale: 0.52 },
-  { amp: 1.2, detail: 0.3, spin: 0.22, x: 1.8, y: 0.85, scale: 0.54 },
-  { amp: 1.9, detail: 0.7, spin: 0.45, x: 1.8, y: 0.85, scale: 0.56 },
-  { amp: 0.45, spin: 0.6, x: 1.8, y: 0.85, scale: 0.6 },
+  { amp: 0.8, spin: 0.6, x: 0.12, y: 0.48, scale: 0.6 },
+  { amp: 1, detail: 0.2, spin: 1, x: 0.12, y: 0.48, scale: 0.62 },
+  { amp: 1.3, detail: 0.4, spin: 1.2, x: 0.12, y: 0.48, scale: 0.64 },
+  { amp: 2.4, detail: 1, spin: 1.6, x: 0.12, y: 0.48, scale: 0.66 },
+  { amp: 0.7, spin: 0.4, x: 0.12, y: 0.48, scale: 0.7 },
 ];
 function steps() {
   const sec = document.querySelector('[data-steps]');
@@ -332,7 +333,7 @@ function heroIntro() {
   (document.fonts ? document.fonts.ready : Promise.resolve()).then(run);
 }
 
-/* 3D-скульптура (public/js/hero3d.js): на першому екрані, а на комп'ютері ще й у секції «Як це працює».
+/* 3D-хвиля з рідкого скла (public/js/hero3d.js): на першому екрані, а на комп'ютері ще й у секції «Як це працює».
    three.js вантажиться лише тут, динамічним import(), коли сторінка вже показана.
    Без WebGL і з prefers-reduced-motion лишається статичний кадр (.hero-scene у site.css). */
 function hasWebGL() {
