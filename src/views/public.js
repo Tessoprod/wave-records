@@ -69,7 +69,7 @@ export function homePage({ homeServices, tracks }) {
       <div class="hero-bottom">
         <p class="hero-sub">${hero.subtitle}</p>
         <div class="hero-ctas">
-          ${btn('/book', hero.cta_book, 'red', icon.arrow, 'data-cta="hero_book"')}
+          ${btn('/book', hero.cta_book, 'neon', icon.arrow, 'data-cta="hero_book"')}
           ${btn('/portfolio', hero.cta_listen, 'glass', icon.play, 'data-cta="hero_listen"')}
         </div>
       </div>
@@ -134,7 +134,7 @@ export function homePage({ homeServices, tracks }) {
         ${steps.items.map((it, i) => html`
         <li class="step"><span class="step-dot" aria-hidden="true"></span><span class="num">${String(i + 1).padStart(2, '0')}</span><p class="step-title">${it.title}</p></li>`)}
       </ol>
-      <div class="steps-cta">${btn('/book', hero.cta_book || 'Записатися', 'red', icon.arrow, 'data-cta="steps_book"')}</div>
+      <div class="steps-cta">${btn('/book', hero.cta_book || 'Записатися', 'neon', icon.arrow, 'data-cta="steps_book"')}</div>
     </div>
   </section>` : ''}`;
 
@@ -148,7 +148,7 @@ export function servicesPage({ sound, media }) {
   const tg = telegramUrl();
   const card = (s) => {
     const cta = s.bookable
-      ? html`<a class="btn btn-red btn-sm" href="${bookHref(s)}">Записатися${icon.arrow}</a>`
+      ? html`<a class="btn btn-neon btn-sm" href="${bookHref(s)}">Записатися${icon.arrow}</a>`
       : html`<a class="btn btn-glass btn-sm" href="${tg}" rel="noopener">${s.category === 'media' ? c.media_cta : 'Обговорити'}${icon.arrowUp}</a>`;
     return html`
     <li class="svc-full glass glass-card">
@@ -209,7 +209,7 @@ export function portfolioPage({ vocal, music, b2b }) {
   <section class="section">
     <div class="container cta-band glass">
       <h2 class="h2">Хочете так само?</h2>
-      ${btn('/book', 'Записатися', 'red', icon.arrow, 'data-cta="portfolio_book"')}
+      ${btn('/book', 'Записатися', 'neon', icon.arrow, 'data-cta="portfolio_book"')}
     </div>
   </section>`;
   return layout({ title: c.title, path: '/portfolio', description: 'Послухайте роботи Wave Records: зведення вокалу, біти та аранжування, музика для бізнесу.', body });
@@ -303,7 +303,7 @@ export function aboutPage({ photos }) {
       <h2 class="h1">${cta.title}</h2>
       <p class="page-lead">${cta.text}</p>
       <div class="hero-ctas">
-        ${btn('/book', cta.cta_book, 'red', icon.arrowUp, 'data-cta="about_book"')}
+        ${btn('/book', cta.cta_book, 'neon', icon.arrowUp, 'data-cta="about_book"')}
         ${btn('/services', cta.cta_services, 'glass', icon.arrowUp)}
       </div>
     </div>
@@ -403,7 +403,7 @@ export function bookPage({ services, preselect }) {
       <div class="bf-submit">
         <p class="bf-summary" id="bf-summary" aria-live="polite"></p>
         <p class="form-error" id="bf-error" role="alert" hidden></p>
-        <button class="btn btn-red btn-lg" type="submit" id="bf-submit">Підтвердити запис${icon.arrow}</button>
+        <button class="btn btn-neon btn-lg" type="submit" id="bf-submit">Підтвердити запис${icon.arrow}</button>
       </div>
     </form>
   </section>
@@ -457,7 +457,7 @@ export function staticBookPage({ booking }) {
   } else if (booking.url) {
     calendar = html`
       <p class="book-embed-note">${info.calendar_note}</p>
-      <a class="btn btn-red btn-lg" href="${booking.url}" target="_blank" rel="noopener" data-cta="book_open_calendar">Обрати дату й час${icon.arrowUp}</a>`;
+      <a class="btn btn-neon btn-lg" href="${booking.url}" target="_blank" rel="noopener" data-cta="book_open_calendar">Обрати дату й час${icon.arrowUp}</a>`;
   } else {
     calendar = html`
       <p class="book-embed-note">Онлайн-запис скоро запрацює. Поки що напишіть або зателефонуйте нам — підберемо зручний час.</p>
@@ -506,7 +506,7 @@ export function contactsPage() {
       <p class="bento-text">${c.address}<br>${c.city}</p>
       <div class="bento-actions">
         <a class="btn btn-glass btn-sm" href="${mapUrl}" target="_blank" rel="noopener">Маршрут${icon.arrowUp}</a>
-        <a class="btn btn-red btn-sm" href="/book">Записатися${icon.arrow}</a>
+        <a class="btn btn-neon btn-sm" href="/book">Записатися${icon.arrow}</a>
       </div>
     </article>
     <a class="glass bento-card bento-link" href="${telLink(c.phone)}">
@@ -552,7 +552,7 @@ export function notFoundPage() {
   <section class="container page-head error-page">
     <h1 class="h1">Сторінку не знайдено</h1>
     <p class="page-lead">Можливо, посилання застаріло. Почніть з головної або одразу оберіть час для запису.</p>
-    <div class="hero-ctas">${btn('/', 'На головну', 'glass')}${btn('/book', 'Записатися', 'red')}</div>
+    <div class="hero-ctas">${btn('/', 'На головну', 'glass')}${btn('/book', 'Записатися', 'neon')}</div>
   </section>`;
   return layout({ title: 'Сторінку не знайдено', path: '/404', body });
 }
@@ -562,7 +562,7 @@ export function errorPage() {
   <section class="container page-head error-page">
     <h1 class="h1">Щось пішло не так</h1>
     <p class="page-lead">Сервер не зміг обробити запит. Оновіть сторінку за хвилину або напишіть нам напряму.</p>
-    <div class="hero-ctas">${btn('/', 'На головну', 'glass')}${btn('/contacts', 'Контакти', 'red')}</div>
+    <div class="hero-ctas">${btn('/', 'На головну', 'glass')}${btn('/contacts', 'Контакти', 'neon')}</div>
   </section>`;
   return layout({ title: 'Помилка', path: '/500', body });
 }

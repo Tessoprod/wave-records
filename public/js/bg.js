@@ -43,16 +43,16 @@
 
   /* ---------- Стрічки хвиль ----------
      depth: 0 — дальня (повільна при прокрутці, тьмяніша), 1 — ближня. */
-  const RED = [255, 46, 46];
-  const BLUE = [53, 107, 255];
+  const PINK = [255, 46, 154];
+  const CYAN = [0, 229, 255];
   const GREY = [220, 222, 228];
   const ribbonsAll = [
     { depth: 0, y: 0.22, color: GREY, alpha: 0.11, amp: 0.05, strands: 4, spread: 7, speed: 0.06, freq: [1.3, 2.9, 5.1], seed: 0.4 },
-    { depth: 0, y: 0.58, color: BLUE, alpha: 0.16, amp: 0.07, strands: 5, spread: 9, speed: 0.05, freq: [1.1, 2.3, 4.4], seed: 2.1 },
-    { depth: 0, y: 0.92, color: RED, alpha: 0.12, amp: 0.06, strands: 4, spread: 8, speed: 0.07, freq: [0.9, 2.6, 4.9], seed: 4.7 },
-    { depth: 1, y: 0.36, color: RED, alpha: 0.2, amp: 0.09, strands: 6, spread: 11, speed: 0.09, freq: [0.8, 1.9, 3.7], seed: 1.3 },
+    { depth: 0, y: 0.58, color: CYAN, alpha: 0.09, amp: 0.07, strands: 5, spread: 9, speed: 0.05, freq: [1.1, 2.3, 4.4], seed: 2.1 },
+    { depth: 0, y: 0.92, color: PINK, alpha: 0.12, amp: 0.06, strands: 4, spread: 8, speed: 0.07, freq: [0.9, 2.6, 4.9], seed: 4.7 },
+    { depth: 1, y: 0.36, color: PINK, alpha: 0.19, amp: 0.09, strands: 6, spread: 11, speed: 0.09, freq: [0.8, 1.9, 3.7], seed: 1.3 },
     { depth: 1, y: 0.74, color: GREY, alpha: 0.1, amp: 0.06, strands: 5, spread: 8, speed: 0.08, freq: [1.2, 2.7, 6.1], seed: 3.3 },
-    { depth: 1, y: 1.12, color: BLUE, alpha: 0.18, amp: 0.08, strands: 5, spread: 10, speed: 0.1, freq: [1, 2.2, 4.1], seed: 5.9 },
+    { depth: 1, y: 1.12, color: CYAN, alpha: 0.08, amp: 0.08, strands: 5, spread: 10, speed: 0.1, freq: [1, 2.2, 4.1], seed: 5.9 },
   ];
   // На телефонах — менше стрічок і ниток у кожній
   const ribbons = mobile

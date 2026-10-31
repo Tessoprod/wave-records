@@ -128,7 +128,7 @@
     && 'IntersectionObserver' in window && 'ResizeObserver' in window;
   if (refract) root.classList.add('lg-refract');
   const TILT = '.svc-card, .glass-card, .bento-card';
-  const RIM = '.glass, .btn-glass, .btn-red, .track-play';
+  const RIM = '.glass, .btn-glass, .btn-neon, .track-play';
   const visibleGlass = new Set();
   let pointer = null;
   let hovered = null;
@@ -593,8 +593,8 @@ uniform sampler2D uH; uniform float uN, uStep, uX0, uR, uCy, uMax;
 uniform sampler2D uBg; uniform vec4 uBgMap;
 uniform vec3 uLight;
 float hAt(float i){ vec4 t = texture2D(uH, vec2((i + .5) / uN, .5)); return (t.r * 65280. + t.g * 255.) / 65535. * uMax; }
-// Фірмовий градієнт: світлі краї → синій → червоний у центрі
-vec3 brand(float c){ vec3 col = mix(vec3(1., .18, .18), vec3(.21, .42, 1.), smoothstep(.02, .36, c)); return mix(col, vec3(.93, .94, .97), smoothstep(.34, .72, c)); }
+// Фірмовий градієнт: світлі краї → вузька смуга ціану → рожевий центр (рожевий домінує)
+vec3 brand(float c){ vec3 col = mix(vec3(1., .18, .6), vec3(.1, .72, .82), smoothstep(.34, .5, c)); return mix(col, vec3(.93, .94, .97), smoothstep(.44, .72, c)); }
 vec3 bgAt(vec2 p){ return texture2D(uBg, (p + uBgMap.xy) * uBgMap.zw).rgb; }
 void main(){
   vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uDpr;
@@ -757,7 +757,7 @@ void main(){
       };
     }
 
-    /* --- Запасний варіант без WebGL: напівпрозорі смужки з відблисками і зсунутими червоною й синьою копіями країв --- */
+    /* --- Запасний варіант без WebGL: напівпрозорі смужки з відблисками і зсунутими рожевою й ціановою копіями країв --- */
     function create2D(cv) {
       const g = cv.getContext('2d');
       if (!g) return null;
@@ -789,16 +789,16 @@ void main(){
             const gr = g.createLinearGradient(0, 0, W, 0);
             gr.addColorStop(0, `rgba(245, 245, 245, ${a1 * 0.4})`);
             gr.addColorStop(0.18, `rgba(245, 245, 245, ${a1})`);
-            gr.addColorStop(0.34, `rgba(53, 107, 255, ${a2})`);
-            gr.addColorStop(0.5, `rgba(255, 46, 46, ${a3})`);
-            gr.addColorStop(0.66, `rgba(53, 107, 255, ${a2})`);
+            gr.addColorStop(0.32, `rgba(0, 229, 255, ${a2 * 0.6})`);
+            gr.addColorStop(0.5, `rgba(255, 46, 154, ${a3})`);
+            gr.addColorStop(0.68, `rgba(0, 229, 255, ${a2 * 0.6})`);
             gr.addColorStop(0.82, `rgba(245, 245, 245, ${a1})`);
             gr.addColorStop(1, `rgba(245, 245, 245, ${a1 * 0.4})`);
             return gr;
           };
           g.globalCompositeOperation = 'lighter';
-          pass('rgba(255, 60, 60, .32)', -1.2, 1); // червона копія краю
-          pass('rgba(70, 120, 255, .36)', 1.2, 1); // синя копія краю
+          pass('rgba(255, 46, 154, .32)', -1.2, 1); // рожева копія краю
+          pass('rgba(0, 229, 255, .26)', 1.2, 1); // ціанова копія краю
           g.globalCompositeOperation = 'source-over';
           pass(grad(0.2, 0.42, 0.5), 0, 1); // тіло смужки
           g.globalCompositeOperation = 'lighter';

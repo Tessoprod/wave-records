@@ -101,6 +101,7 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter+Tight:wght@800;900&family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="${asset('vendor/lenis-1.3.27.css')}">
   <link rel="stylesheet" href="${asset('css/site.css')}">
   ${analyticsHead(s)}
 </head>
@@ -112,14 +113,14 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <header class="site-header glass" data-header>
     <a class="logo" href="/" aria-label="${s.company} — на головну">${logoMark()}</a>
     <div class="header-actions">
-      <a class="btn btn-red btn-sm header-book" href="/book">Записатися</a>
+      <a class="btn btn-neon btn-sm header-book" href="/book">Записатися</a>
       <button class="btn btn-glass btn-sm menu-toggle" type="button" aria-expanded="false" aria-controls="site-menu" data-menu-toggle>
         <span class="menu-label">Меню</span><span class="burger" aria-hidden="true"><i></i><i></i></span>
       </button>
     </div>
   </header>
 
-  <div class="menu" id="site-menu" role="dialog" aria-modal="true" aria-label="Меню сайту" hidden data-menu>
+  <div class="menu" id="site-menu" role="dialog" aria-modal="true" aria-label="Меню сайту" hidden data-menu data-lenis-prevent>
     <nav class="menu-inner container">
       <ul class="menu-links">${navLinks}</ul>
       <div class="menu-meta">
@@ -179,6 +180,12 @@ export function layout({ title, description, path: current = '/', body, bodyClas
 
   <script src="${asset('js/bg.js')}" defer></script>
   <script src="${asset('js/site.js')}" defer></script>
+  <!-- Анімації: бібліотеки з public/vendor (версія в назві файлу), ініціалізація — public/js/motion.js -->
+  <script src="${asset('vendor/gsap-3.15.0.min.js')}" defer></script>
+  <script src="${asset('vendor/ScrollTrigger-3.15.0.min.js')}" defer></script>
+  <script src="${asset('vendor/SplitText-3.15.0.min.js')}" defer></script>
+  <script src="${asset('vendor/lenis-1.3.27.min.js')}" defer></script>
+  <script type="module" src="${asset('js/motion.js')}"></script>
   ${scripts.map((src) => html`<script src="${asset(src)}" defer></script>`)}
 </body>
 </html>`;
