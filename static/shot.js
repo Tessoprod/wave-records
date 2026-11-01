@@ -13,7 +13,6 @@
 // --hover=S  — навести мишу на перший елемент за CSS-селектором S (стан наведення); з --full не поєднується.
 // --intro    — показати інтро першого входу (за замовчуванням воно пропускається, щоб знімати саму сторінку).
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -44,7 +43,10 @@ const browser = [
 ].find((p) => fs.existsSync(p));
 if (!browser) { console.error('Не знайдено Microsoft Edge або Google Chrome.'); process.exit(1); }
 
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'wave-shot-'));
+// Один тимчасовий профіль браузера — у _shots/.profile (не в %TEMP%, де профілі накопичуються); після зйомки видаляється
+const profile = path.join(OUT, '.profile');
+fs.rmSync(profile, { recursive: true, force: true });
+fs.mkdirSync(profile, { recursive: true });
 const proc = spawn(browser, ['--headless=new', '--hide-scrollbars', '--disable-gpu', '--no-first-run',
   `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
 
@@ -160,5 +162,8 @@ try {
   ws?.close();
   proc.kill();
   await sleep(500);
-  try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* браузер ще тримає файли */ }
+  // Браузер може ще кілька секунд тримати файли профілю — пробуємо видалити кілька разів
+  for (let i = 0; i < 10; i++) {
+    try { fs.rmSync(profile, { recursive: true, force: true }); break; } catch { await sleep(500); }
+  }
 }
