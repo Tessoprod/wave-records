@@ -65,7 +65,10 @@ export function homePage({ homeServices, tracks }) {
   const why = block('home.why');
   const steps = block('home.steps');
 
+  // Перший екран і Послуги — у спільному контейнері: на широкому екрані motion.js накладає Послуги
+  // поверх першого екрана й закріплює його, поки картки розходяться з центру на свої місця
   const body = html`
+  <div class="home-stage" data-stage>
   ${hero.visible ? html`
   <section class="hero">
     <div class="hero-scene" data-hero-scene aria-hidden="true"></div>
@@ -87,7 +90,7 @@ export function homePage({ homeServices, tracks }) {
   <div id="after-hero" aria-hidden="true"></div>` : ''}
 
   ${svc.visible && homeServices.length ? html`
-  <section class="section">
+  <section class="section svc-section">
     <div class="container">
       <header class="sec-head">
         <h2 class="h2">${svc.title}</h2>
@@ -105,6 +108,7 @@ export function homePage({ homeServices, tracks }) {
       </ul>
     </div>
   </section>` : ''}
+  </div>
 
   ${marquee()}
 

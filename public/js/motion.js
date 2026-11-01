@@ -81,7 +81,8 @@ function cascade(items, { y = 40, x = 0, stagger = 0.08, onEnter } = {}) {
 
 /* ---------- 1. Заголовки й тексти ---------- */
 function headings() {
-  $$('main .h1, main .h2').filter(notInDialog).filter((el) => !(el.tagName === 'H1' && cameByTransition())).forEach((el) => {
+  $$('main .h1, main .h2').filter(notInDialog).filter((el) => !(el.tagName === 'H1' && cameByTransition()))
+    .filter((el) => !(motion.stage && el.closest('.svc-section'))).forEach((el) => {
     if (reduceMotion || !SplitText) {
       gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: SOFT, scrollTrigger: onceAt(el, 'top 92%') });
       return;
@@ -103,9 +104,73 @@ function headings() {
   });
 }
 
+/* ---------- Поява Послуг на головній ----------
+   Перший екран закріплюється (pin + scrub, синхронно з Lenis). Під час прокрутки текст іде вгору й згасає,
+   3D-сцена віддаляється, а з центру екрана виїжджають картки послуг: спершу купкою, зменшені, напівпрозорі
+   й розмиті, потім каскадом розходяться на свої місця; заголовок проявляється разом із ними.
+   Щойно всі картки на місцях — закріплення знімається. Лише широкий екран (від 1101 px), де Послуги
+   вміщаються в один екран; на телефоні й при prefers-reduced-motion — звичайна поява (blocks()). */
+function servicesStage() {
+  const stage = document.querySelector('[data-stage]');
+  const svc = stage?.querySelector('.svc-section');
+  const hero = stage?.querySelector('.hero');
+  if (!svc || !hero || reduceMotion || !matchMedia('(min-width: 1101px)').matches) return false;
+  root.classList.add('stage-on');
+  if (svc.offsetHeight > innerHeight) { root.classList.remove('stage-on'); return false; }
+  const items = $$('.svc-grid > li', svc);
+  const head = $$('.sec-head > *', svc);
+  const inner = hero.querySelector('[data-hero-intro]');
+  const hint = hero.querySelector('[data-scroll-hint]');
+  // Зсув картки від її місця до центру екрана (без урахування transform — рахуємо через offset*)
+  const pos = (el) => {
+    let x = 0; let y = 0;
+    for (let n = el; n && n !== stage; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
+    return { x: x + el.offsetWidth / 2, y: y + el.offsetHeight / 2 };
+  };
+  const toCenterX = (i, el) => innerWidth / 2 - pos(el).x + (i - (items.length - 1) / 2) * 6;
+  const toCenterY = (i, el) => innerHeight / 2 - pos(el).y + (i % 2 ? 5 : -5);
+
+  const tl = gsap.timeline({
+    defaults: { ease: 'none' },
+    scrollTrigger: {
+      trigger: stage,
+      start: 'top top',
+      end: () => `+=${Math.round(innerHeight * 1.3)}`,
+      pin: true,
+      scrub: 0.8,
+      anticipatePin: 1,
+      invalidateOnRefresh: true,
+      onUpdate: (st) => {
+        motion.hero?.setScroll(Math.min(1, st.progress * 1.4));
+        svc.classList.toggle('is-placed', st.progress > 0.9);
+        if (inner) inner.style.pointerEvents = st.progress > 0.2 ? 'none' : '';
+      },
+    },
+  });
+  // Текст першого екрана йде вгору й згасає через змінну --stage-out (стилі .hero-inner у site.css):
+  // так сцена не перебиває появу тексту й завжди стартує з нуля. «Scroll» ховається сам із початком прокрутки.
+  tl.fromTo(hero, { '--stage-out': 0 }, { '--stage-out': 1, duration: 0.35, ease: 'power2.in' }, 0);
+  // Картки з'являються купкою в центрі…
+  tl.fromTo(items, { x: toCenterX, y: toCenterY, scale: 0.5, rotate: (i) => (i % 2 ? 1 : -1) * (3 + i), opacity: 0, filter: 'blur(10px)' },
+    { scale: 0.6, opacity: 0.45, filter: 'blur(6px)', duration: 0.12, ease: 'power1.out', stagger: 0.015 }, 0.18)
+  // …і каскадом розходяться на свої місця
+    .to(items, { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out', stagger: 0.07 }, 0.32)
+    .fromTo(head, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.3, ease: 'power3.out', stagger: 0.06 }, 0.34);
+
+  // «Scroll» веде одразу в кінець анімації, де картки вже на місцях
+  hint?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const end = tl.scrollTrigger.end;
+    if (motion.lenis) motion.lenis.scrollTo(end); else scrollTo({ top: end, behavior: 'smooth' });
+  });
+  return true;
+}
+
 /* ---------- 2. Картки, треки, номери ---------- */
 function blocks() {
-  cascade($$(':is(.svc-grid, .svc-full-grid, .phil-grid, .bento, .book-info, .gallery, .chips) > *'));
+  const groups = motion.stage ? '.svc-full-grid, .phil-grid, .bento, .book-info, .gallery, .chips' : '.svc-grid, .svc-full-grid, .phil-grid, .bento, .book-info, .gallery, .chips';
+  cascade($$(`:is(${groups}) > *`));
   $$('.book-embed, .cta-band, .tl-text, .empty-state').forEach((el) => cascade([el], { y: 30 }));
 
   // Треки в'їжджають по черзі, хвиля промальовується зліва направо
@@ -266,31 +331,110 @@ function magnets() {
   });
 }
 
-/* Пункти меню: літери прокручуються при наведенні (дві копії тексту, друга — під першою) */
-function menuRoll() {
-  if (!finePointer || reduceMotion) return;
-  $$('.menu-links a').forEach((a) => {
-    const text = a.textContent.trim();
-    if (!text || a.querySelector('.roll')) return;
-    const copy = (cls) => {
-      const s = document.createElement('span');
-      s.className = cls;
-      s.setAttribute('aria-hidden', 'true');
-      [...text].forEach((ch, i) => {
-        const c = document.createElement('span');
-        c.className = 'roll-c';
-        c.style.setProperty('--i', i);
-        c.textContent = ch;
-        s.appendChild(c);
+/* Живий логотип у шапці й футері: 12 смужок — міні-еквалайзер.
+   Поява — смужки по черзі виростають (шапка — одразу після інтро, футер — коли з'являється на екрані);
+   у спокої ледь помітно дихають; при наведенні чи фокусі по них проходить хвиля з неоновим відтінком;
+   коли грає трек, реагують на спектр аналізатора (window.wrAudioLevel.freq із site.js).
+   Висоту й відтінок передаємо змінними --eq і --glow (стилі .logo-bars у site.css). */
+function logoEq() {
+  if (reduceMotion) return;
+  const logos = $$('.site-header .logo, .site-footer .logo').map((logo) => {
+    const bars = $$('.logo-bars i', logo);
+    return { logo, bars, st: bars.map(() => ({ grow: 0, wave: 0 })), visible: false, last: [] };
+  }).filter((l) => l.bars.length);
+  if (!logos.length) return;
+  root.classList.add('eq-on');
+
+  const appear = (l) => gsap.to(l.st, { grow: 1, duration: 0.9, ease: EASE, stagger: 0.05 });
+  const wave = (l) => l.st.forEach((st, i) => gsap.to(st, {
+    keyframes: [{ wave: 1, duration: 0.22, ease: 'sine.out' }, { wave: 0, duration: 0.5, ease: 'sine.inOut' }],
+    delay: i * 0.035, overwrite: true,
+  }));
+
+  logos.forEach((l) => {
+    const inFooter = !!l.logo.closest('.site-footer');
+    new IntersectionObserver(([en]) => {
+      l.visible = en.isIntersecting;
+      // Футер: смужки виростають, коли він уперше з'являється на екрані
+      if (inFooter && en.isIntersecting && !l.appeared) { l.appeared = true; appear(l); }
+    }).observe(l.logo);
+    if (!inFooter) motion.introDone.then(() => { l.appeared = true; appear(l); });
+    if (finePointer) l.logo.addEventListener('mouseenter', () => wave(l));
+    l.logo.addEventListener('focus', () => { if (l.logo.matches(':focus-visible')) wave(l); });
+  });
+
+  gsap.ticker.add((time) => {
+    const f = window.wrAudioLevel?.freq;
+    for (const l of logos) {
+      if (!l.visible) continue;
+      l.bars.forEach((bar, i) => {
+        const st = l.st[i];
+        // Дихання: повільно і з малою амплітудою, щоб не відволікати
+        const breathe = 0.022 * Math.sin(time * 0.9 + i * 0.55);
+        const music = f ? (f[Math.min(f.length - 1, 2 + i * 4)] / 255) ** 2 : 0;
+        const eq = (st.grow * (1 + breathe + st.wave * 0.32 + music * 0.45)).toFixed(3);
+        const glow = Math.min(1, st.wave + music * 0.7).toFixed(2);
+        if (l.last[i] !== eq + glow) {
+          l.last[i] = eq + glow;
+          bar.style.setProperty('--eq', eq);
+          bar.style.setProperty('--glow', glow);
+        }
       });
-      return s;
-    };
-    const roll = document.createElement('span');
-    roll.className = 'roll';
-    roll.append(copy('roll-a'), copy('roll-b'));
-    a.setAttribute('aria-label', text);
-    a.textContent = '';
-    a.appendChild(roll);
+    }
+  });
+}
+
+/* Меню-хвиля: темна SVG-форма з хвилястим краєм накриває екран згори донизу, сайт позаду розмивається,
+   потім каскадом з'являються пункти; закриття — та сама хвиля назад угору.
+   site.js викликає wrMotion.menuAnim(open) і чекає завершення (фокус, hidden). */
+function menuWave() {
+  const menu = document.querySelector('[data-menu]');
+  if (!menu || reduceMotion) return;
+  const fill = menu.querySelector('.menu-wave-fill');
+  const edge = menu.querySelector('.menu-wave-edge');
+  const blur = menu.querySelector('.menu-blur');
+  const links = menu.querySelectorAll('.menu-links li');
+  const foot = menu.querySelector('.menu-foot');
+  if (!fill || !edge) return;
+  menu.classList.add('is-animated');
+  // Край хвилі: дві кубічні дуги; y — висота краю (у % екрана), a — амплітуда, ph — фаза
+  const w = { y: -14, a: 0, ph: 0 };
+  const draw = () => {
+    const v = (k) => w.y + w.a * Math.sin(w.ph + k * 1.9);
+    const e = (k) => v(k).toFixed(2);
+    // Друга дуга починається з дзеркальної контрольної точки — стик посередині гладкий, без зламу
+    const mirror = (2 * v(3) - v(2)).toFixed(2);
+    const curve = `C83 ${e(1)} 67 ${e(2)} 50 ${e(3)} C33 ${mirror} 17 ${e(5)} 0 ${e(6)}`;
+    fill.setAttribute('d', `M0 0 L100 0 L100 ${e(0)} ${curve} Z`);
+    edge.setAttribute('d', `M100 ${e(0)} ${curve}`);
+  };
+  draw();
+  let tl = null;
+  motion.menuAnim = (open) => new Promise((resolve) => {
+    tl?.kill();
+    tl = gsap.timeline();
+    if (open) {
+      gsap.set(links, { opacity: 0, y: 28 });
+      gsap.set(foot, { opacity: 0, y: 14 });
+      gsap.set(edge, { opacity: 0.85 });
+      Object.assign(w, { y: -14, a: 0, ph: 0 });
+      tl.to(blur, { opacity: 1, duration: 0.5, ease: 'power2.out' }, 0)
+        .to(w, { y: 112, ph: 3.2, duration: 0.85, ease: 'power3.inOut', onUpdate: draw }, 0)
+        .to(w, { a: 9, duration: 0.4, ease: 'sine.out' }, 0)
+        .to(w, { a: 0, duration: 0.45, ease: 'sine.in' }, 0.4)
+        .to(edge, { opacity: 0, duration: 0.2 }, 0.68)
+        .call(resolve, null, 0.6)
+        .to(links, { opacity: 1, y: 0, duration: 0.75, ease: EASE, stagger: 0.06 }, 0.5)
+        .to(foot, { opacity: 1, y: 0, duration: 0.6, ease: SOFT }, 0.8);
+    } else {
+      gsap.set(edge, { opacity: 0.85 });
+      tl.to([links, foot], { opacity: 0, y: -12, duration: 0.25, ease: 'power2.in', stagger: 0.02 }, 0)
+        .to(w, { y: -14, ph: 0, duration: 0.7, ease: 'power3.inOut', onUpdate: draw }, 0.12)
+        .to(w, { a: 8, duration: 0.32, ease: 'sine.out' }, 0.12)
+        .to(w, { a: 0, duration: 0.38, ease: 'sine.in' }, 0.44)
+        .to(blur, { opacity: 0, duration: 0.45, ease: 'power2.in' }, 0.4)
+        .call(resolve, null, 0.85);
+    }
   });
 }
 
@@ -484,7 +628,7 @@ async function heroScene() {
   }, { passive: true });
 
   // Скрол: поки перший екран їде вгору, скульптура віддаляється, зменшується і зміщується
-  if (ScrollTrigger) {
+  if (ScrollTrigger && !motion.stage) {
     ScrollTrigger.create({
       trigger: host.closest('.hero') || host,
       start: 'top top',
@@ -520,12 +664,14 @@ try {
   motion.introDone = intro();
   heroIntro();
   scrollHint();
+  motion.stage = servicesStage();
   steps();
   blocks();
   about();
   marquees();
   magnets();
-  menuRoll();
+  menuWave();
+  logoEq();
   // Заголовки ділимо на рядки після завантаження шрифтів
   (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {
     try { headings(); } catch (err) { console.error(err); showAll(); }

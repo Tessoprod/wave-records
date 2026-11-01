@@ -91,28 +91,46 @@
 
   const menu = $('[data-menu]');
   const toggle = $('[data-menu-toggle]');
-  function setMenu(open) {
-    if (!menu || !toggle) return;
+  /* Меню: тут — стан, доступність і фокус. Анімацію хвилі дає motion.js (window.wrMotion.menuAnim);
+     якщо її немає (без GSAP), меню просто проявляється класом .is-open. */
+  let menuBusy = false;
+  const isOpen = () => toggle?.getAttribute('aria-expanded') === 'true';
+  async function setMenu(open) {
+    if (!menu || !toggle || menuBusy || open === isOpen()) return;
+    menuBusy = true;
     toggle.setAttribute('aria-expanded', String(open));
     $('.menu-label', toggle).textContent = open ? 'Закрити' : 'Меню';
     document.body.classList.toggle('menu-open', open);
-    // Меню розкривається колом із центру кнопки (clip-path у site.css)
-    const r = toggle.getBoundingClientRect();
-    menu.style.setProperty('--menu-x', `${Math.round(r.left + r.width / 2)}px`);
-    menu.style.setProperty('--menu-y', `${Math.round(r.top + r.height / 2)}px`);
-    if (open) {
-      menu.hidden = false;
-      requestAnimationFrame(() => requestAnimationFrame(() => menu.classList.add('is-open')));
-      setTimeout(() => $('a', menu)?.focus({ preventScroll: true }), 80);
-    } else {
-      menu.classList.remove('is-open');
-      setTimeout(() => { if (!menu.classList.contains('is-open')) menu.hidden = true; }, reduceMotion ? 0 : 620);
+    const anim = window.wrMotion?.menuAnim;
+    try {
+      if (open) {
+        menu.hidden = false;
+        if (anim) await anim(true);
+        else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => { menu.classList.add('is-open'); r(); })));
+        $('.menu-links a', menu)?.focus({ preventScroll: true });
+      } else {
+        if (anim) await anim(false);
+        else { menu.classList.remove('is-open'); await new Promise((r) => setTimeout(r, reduceMotion ? 0 : 300)); }
+        menu.hidden = true;
+        if (menu.contains(document.activeElement) || document.activeElement === document.body) toggle.focus({ preventScroll: true });
+      }
+    } finally {
+      menuBusy = false;
     }
   }
-  toggle?.addEventListener('click', () => setMenu(toggle.getAttribute('aria-expanded') !== 'true'));
+  toggle?.addEventListener('click', () => setMenu(!isOpen()));
   menu?.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && toggle?.getAttribute('aria-expanded') === 'true') { setMenu(false); toggle.focus(); }
+    if (!isOpen()) return;
+    if (e.key === 'Escape') { setMenu(false); toggle.focus(); return; }
+    // Поки меню відкрите, фокус ходить по колу: пункти меню, контакти, «Записатися» і кнопка «Закрити»
+    if (e.key === 'Tab') {
+      const items = [...$$('a, button', menu), toggle].filter((el) => !el.hidden && el.offsetParent !== null);
+      const i = items.indexOf(document.activeElement);
+      const next = i === -1 ? 0 : (i + (e.shiftKey ? -1 : 1) + items.length) % items.length;
+      e.preventDefault();
+      items[next].focus();
+    }
   });
 
   /* ---------- Рідке скло ----------

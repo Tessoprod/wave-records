@@ -81,7 +81,8 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   const base = config.publicUrl || '';
   const fullTitle = title ? `${title} — ${s.company}` : `${s.company} — студія звукозапису у Львові`;
   const desc = description || 'Запис, продакшн, зведення та мастеринг у Львові. Від ідеї до релізу.';
-  const navLinks = NAV.map(([href, label]) => html`<li><a href="${href}" ${href === current ? raw('aria-current="page"') : ''}>${label}</a></li>`);
+  // Пункти меню: номер, назва і лінія-хвиля, що промальовується при наведенні
+  const navLinks = NAV.map(([href, label], i) => html`<li><a href="${href}" ${href === current ? raw('aria-current="page"') : ''}><span class="menu-num" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span><span class="menu-text">${label}</span><svg class="menu-line" viewBox="0 0 120 8" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M0 4 Q7.5 0 15 4 T30 4 T45 4 T60 4 T75 4 T90 4 T105 4 T120 4" pathLength="1"/></svg></a></li>`);
 
   return '<!doctype html>' + html`
 <html lang="uk"${config.staticSite ? raw(' data-static') : ''}>
@@ -139,13 +140,22 @@ export function layout({ title, description, path: current = '/', body, bodyClas
     </div>
   </header>
 
+  <!-- Меню: сайт позаду розмивається (.menu-blur), хвиля (SVG) накриває екран згори донизу, потім каскадом пункти.
+       Анімацію веде motion.js (wrMotion.menuAnim), стан і фокус — site.js -->
   <div class="menu" id="site-menu" role="dialog" aria-modal="true" aria-label="Меню сайту" hidden data-menu data-lenis-prevent>
-    <nav class="menu-inner container">
-      <ul class="menu-links">${navLinks}</ul>
-      <div class="menu-meta">
-        <p>${c.city}<br>${c.address}</p>
-        <p><a href="${telLink(c.phone)}">${c.phone}</a><br>${c.telegram ? html`<a href="https://t.me/${c.telegram}" rel="noopener">Telegram @${c.telegram}</a>` : ''}</p>
-        <p>${c.schedule_days}, ${c.schedule_hours}</p>
+    <div class="menu-blur" aria-hidden="true"></div>
+    <svg class="menu-wave" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <defs><linearGradient id="menu-edge" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#FF2E9A"/><stop offset="1" stop-color="#00E5FF"/></linearGradient></defs>
+      <path class="menu-wave-fill" d="M0 0 L100 0 L100 100 L0 100 Z"/>
+      <path class="menu-wave-edge" d="M100 100 L0 100" stroke="url(#menu-edge)" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <nav class="menu-inner container" aria-label="Головне меню">
+      <ol class="menu-links" role="list">${navLinks}</ol>
+      <div class="menu-foot">
+        <p class="menu-contact">${c.city}, ${c.address}</p>
+        <p class="menu-contact"><a href="${telLink(c.phone)}">${c.phone}</a></p>
+        ${c.telegram ? html`<p class="menu-contact"><a href="https://t.me/${c.telegram}" rel="noopener">Telegram @${c.telegram}</a></p>` : ''}
+        <a class="btn btn-neon menu-book" href="/book">Записатися${icon.arrow}</a>
       </div>
     </nav>
   </div>
