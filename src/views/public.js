@@ -82,7 +82,9 @@ export function homePage({ homeServices, tracks }) {
         </div>
       </div>
     </div>
-  </section>` : ''}
+    <a class="scroll-hint" href="#after-hero" data-scroll-hint aria-label="Прокрутити до наступного блоку"><span aria-hidden="true">Scroll</span><i aria-hidden="true"></i></a>
+  </section>
+  <div id="after-hero" aria-hidden="true"></div>` : ''}
 
   ${svc.visible && homeServices.length ? html`
   <section class="section">

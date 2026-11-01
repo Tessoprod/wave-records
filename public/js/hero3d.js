@@ -340,6 +340,7 @@ export function createHeroScene(host, { mobile = false, weak = false } = {}) {
 
   function frame(now) {
     raf = state.running ? requestAnimationFrame(frame) : 0;
+    state.frames = (state.frames || 0) + 1; // скільки кадрів уже відрендерено (motion.js чекає кілька перед появою)
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     time += dt;

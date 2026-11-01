@@ -9,7 +9,7 @@
    тут кожен прихований елемент обов'язково проявляється. Якщо щось пішло не так — клас знімається
    і весь вміст видно.
    prefers-reduced-motion: без Lenis, без руху — лише проявлення прозорістю.
-   Сенсорні екрани: без власного курсора й магнітних кнопок, секція кроків — без закріплення. */
+   Сенсорні екрани: без магнітних кнопок. Курсор — завжди системний. */
 
 const { gsap, ScrollTrigger, SplitText, Lenis } = window;
 const root = document.documentElement;
@@ -26,8 +26,6 @@ const cameByTransition = () => root.classList.contains('vt-in');
 /* ---------- Плавний скрол ---------- */
 function smoothScroll() {
   if (!gsap || !ScrollTrigger || !Lenis || reduceMotion) return;
-  // Відступ під шапку для якорів — той самий, що й scroll-padding-top у site.css
-  const headerOffset = () => -(parseFloat(getComputedStyle(root).scrollPaddingTop) || 0);
   const lenis = motion.lenis = new Lenis({
     autoRaf: false,
     lerp: 0.1,
@@ -53,7 +51,8 @@ function smoothScroll() {
     e.preventDefault();
     setTimeout(() => {
       lenis.start();
-      lenis.scrollTo(target, { offset: headerOffset() });
+      // Відступ під шапку Lenis бере сам зі scroll-padding-top у site.css (додатковий offset подвоїв би його)
+      lenis.scrollTo(target);
       history.replaceState(null, '', a.hash);
     }, body.classList.contains('menu-open') ? 380 : 0);
   });
@@ -162,18 +161,15 @@ function steps() {
   };
   if (reduceMotion) { setStep(1); return; }
   setStep(0);
-  if (wide) {
-    // Комп'ютер: секція закріплюється, а скрол проводить через 5 кроків
-    sec.classList.add('is-pinned');
-    ScrollTrigger.create({
-      trigger: sec, start: 'top top', end: () => `+=${Math.round(innerHeight * 1.6)}`,
-      pin: true, anticipatePin: 1,
-      onUpdate: (st) => setStep(st.progress),
-    });
-  } else {
-    // Телефон: без закріплення — кроки підсвічуються, поки список проходить через екран
-    ScrollTrigger.create({ trigger: list, start: 'top 75%', end: 'bottom 55%', onUpdate: (st) => setStep(st.progress) });
-  }
+  // Коли блок з'являється, лінія один раз заповнюється (на комп'ютері — зліва направо, на телефоні — згори донизу),
+  // а кроки підсвічуються по черзі, щойно лінія доходить до їхньої точки. Прокрутка назад нічого не повертає.
+  const fill = { p: 0 };
+  ScrollTrigger.create({
+    trigger: list,
+    start: 'top 80%',
+    once: true,
+    onEnter: () => gsap.to(fill, { p: 1, duration: 1.8, ease: 'power1.inOut', onUpdate: () => setStep(fill.p) }),
+  });
 }
 
 /* ---------- 3. Про студію ---------- */
@@ -207,6 +203,20 @@ function about() {
       gsap.fromTo(el, { scale: 0.92 }, { scale: 1, ease: 'none', clearProps: 'transform', scrollTrigger: { trigger: el, start: 'top bottom', end: 'center 60%', scrub: 0.5 } });
     });
   }
+}
+
+/* Підказка прокрутки на першому екрані: зникає, щойно почали гортати, і повертається нагорі.
+   Клік — плавний перехід до наступного блоку (якір #after-hero обробляє smoothScroll). */
+function scrollHint() {
+  const hint = document.querySelector('[data-scroll-hint]');
+  if (!hint) return;
+  let hidden = false;
+  const update = () => {
+    const h = scrollY > 24;
+    if (h !== hidden) { hidden = h; hint.classList.toggle('is-hidden', h); }
+  };
+  addEventListener('scroll', update, { passive: true });
+  update();
 }
 
 /* ---------- 4. Біжучий рядок: швидкість від швидкості скролу, напрям — від напрямку ---------- */
@@ -254,38 +264,6 @@ function magnets() {
     });
     btn.addEventListener('pointerleave', () => gsap.to(btn, { '--magx': '0px', '--magy': '0px', duration: 0.8, ease: EASE, overwrite: 'auto' }));
   });
-}
-
-function cursor() {
-  if (!finePointer || reduceMotion) return;
-  const c = document.createElement('div');
-  c.className = 'cursor';
-  c.setAttribute('aria-hidden', 'true');
-  c.innerHTML = '<span class="cursor-dot"></span><span class="cursor-label"></span>';
-  document.body.appendChild(c);
-  root.classList.add('has-cursor');
-  const label = c.querySelector('.cursor-label');
-  gsap.set(c, { xPercent: -50, yPercent: -50 });
-  const xTo = gsap.quickTo(c, 'x', { duration: 0.35, ease: SOFT });
-  const yTo = gsap.quickTo(c, 'y', { duration: 0.35, ease: SOFT });
-  let first = true;
-  const update = (e) => {
-    if (e.pointerType && e.pointerType !== 'mouse') return;
-    if (first) { gsap.set(c, { x: e.clientX, y: e.clientY }); first = false; }
-    xTo(e.clientX);
-    yTo(e.clientY);
-    const t = e.target instanceof Element ? e.target : null;
-    // Над полями вводу та iframe запису — системний курсор
-    const native = !t || t.closest('input, textarea, select, iframe, [contenteditable="true"]');
-    c.classList.toggle('is-visible', !native);
-    const text = t?.closest('.track') ? 'Play' : t?.closest('.g-open') ? 'Відкрити' : '';
-    if (text) label.textContent = text;
-    c.classList.toggle('is-label', !!text);
-    c.classList.toggle('is-link', !text && !!t?.closest('a, button, label, summary, [role="slider"], [role="button"]'));
-  };
-  addEventListener('pointermove', update, { passive: true });
-  addEventListener('pointerover', update, { passive: true });
-  document.documentElement.addEventListener('pointerleave', () => c.classList.remove('is-visible'));
 }
 
 /* Пункти меню: літери прокручуються при наведенні (дві копії тексту, друга — під першою) */
@@ -422,30 +400,38 @@ function intro() {
   });
 }
 
-/* Поява заголовка першого екрана: літери WAVE RECORDS виїжджають знизу, далі підзаголовок і кнопки.
-   До початку анімації текст схований (html.js у site.css); без анімацій — просто показуємо. */
+/* Поява першого екрана: текст і 3D-сцена проявляються разом, однією анімацією.
+   Чекаємо шрифти, інтро і готовність сцени (кілька вже анімованих кадрів або рішення про статичний кадр),
+   але не довше 3 с — тоді текст з'являється, а сцена проявиться, щойно буде готова.
+   Літери WAVE RECORDS виїжджають знизу, далі підзаголовок і кнопки. */
 function heroIntro() {
   const intro = document.querySelector('[data-hero-intro]');
-  if (!intro) return;
+  const host = document.querySelector('[data-hero-scene]');
+  const revealScene = () => host?.classList.add('is-ready');
+  if (!intro) { motion.heroReady?.then(revealScene); return; }
   const show = () => intro.classList.add('is-in');
-  if (!gsap || reduceMotion || cameByTransition()) { show(); return; }
+  if (!gsap || reduceMotion || cameByTransition()) { show(); motion.heroReady?.then(revealScene); return; }
   const line1 = intro.querySelector('.hero-l1');
   const rest = intro.querySelectorAll('.hero-l2, .hero-sub, .hero-ctas');
   const run = () => {
     show();
+    // Сцена проявляється в той самий момент, що й текст (або щойно буде готова, якщо ще ні)
+    motion.heroReady?.then(revealScene);
     const split = SplitText && line1 ? SplitText.create(line1, { type: 'chars', mask: 'chars' }) : null;
     const tl = gsap.timeline({ defaults: { ease: EASE }, onComplete: () => split?.revert() });
     if (split) tl.from(split.chars, { yPercent: 110, duration: 1.2, stagger: 0.035 });
     else if (line1) tl.from(line1, { y: 40, opacity: 0, duration: 1.1 });
     tl.from(rest, { y: 28, opacity: 0, duration: 1, stagger: 0.1 }, split ? 0.35 : 0.2);
   };
-  // Літери ділимо після завантаження шрифтів (інакше їхня ширина буде хибною) і після інтро
-  Promise.all([document.fonts ? document.fonts.ready : null, motion.introDone]).then(run);
+  // Літери ділимо після завантаження шрифтів (інакше їхня ширина буде хибною), після інтро й готовності сцени
+  const sceneOrTimeout = Promise.race([motion.heroReady || Promise.resolve(), new Promise((r) => setTimeout(r, 3000))]);
+  Promise.all([document.fonts ? document.fonts.ready : null, motion.introDone, sceneOrTimeout]).then(run);
 }
 
 /* 3D-скульптура (public/js/hero3d.js): на першому екрані, а на комп'ютері ще й у секції «Як це працює».
-   three.js вантажиться лише тут, динамічним import(), коли сторінка вже показана.
-   Без WebGL і з prefers-reduced-motion лишається статичний кадр (.hero-scene у site.css). */
+   three.js вантажиться лише тут, динамічним import(), одразу після запуску motion.js.
+   Проміс завершується, коли сцена вже відрендерила кілька анімованих кадрів (canvas ще прихований),
+   або коли вирішено показати статичний кадр (без WebGL, prefers-reduced-motion, помилка). */
 function hasWebGL() {
   try {
     const c = document.createElement('canvas');
@@ -455,7 +441,7 @@ function hasWebGL() {
 async function heroScene() {
   const host = document.querySelector('[data-hero-scene]');
   if (!host) return;
-  const fallback = () => host.classList.add('is-fallback');
+  const fallback = () => host.classList.add('is-fallback'); // статичний кадр проявить heroIntro()
   if (reduceMotion || !hasWebGL()) { fallback(); return; }
   const mobile = matchMedia('(max-width: 760px), (pointer: coarse)').matches;
   // Слабкі пристрої: мало ядер чи пам'яті — менша деталізація і без згладжування
@@ -506,9 +492,16 @@ async function heroScene() {
       onUpdate: (st) => hero.setScroll(st.progress),
     });
   }
-  hero.renderOnce();
   sync();
-  requestAnimationFrame(() => host.classList.add('is-ready'));
+  // Чекаємо кілька відрендерених кадрів анімації (або 1,5 с, якщо сцена поза екраном чи вкладка неактивна)
+  const t0 = performance.now();
+  await new Promise((resolve) => {
+    (function check() {
+      if (hero.frames >= 4 || !hero.running || performance.now() - t0 > 1500) resolve();
+      else requestAnimationFrame(check);
+    })();
+  });
+  if (!hero.running) hero.renderOnce();
 }
 
 /* ---------- Запуск ---------- */
@@ -520,17 +513,18 @@ try {
   if (!gsap || !ScrollTrigger) throw new Error('GSAP не завантажився');
   gsap.registerPlugin(...[ScrollTrigger, SplitText].filter(Boolean));
   smoothScroll();
-  // Під час інтро 3D-сцена вантажиться одразу — лічильник показує саме її завантаження
-  if (root.classList.contains('wr-intro') && document.querySelector('[data-hero-scene]')) motion.heroReady = heroScene();
+  // 3D-сцена вантажиться одразу: перший екран чекає на неї, щоб текст і сцена з'явилися разом
+  // (під час інтро лічильник показує саме її завантаження)
+  const sceneHost = document.querySelector('[data-hero-scene]');
+  if (sceneHost) motion.heroReady = heroScene().catch(() => sceneHost.classList.add('is-fallback'));
   motion.introDone = intro();
   heroIntro();
-  // Кроки — першими: закріплення змінює позиції всіх наступних тригерів
+  scrollHint();
   steps();
   blocks();
   about();
   marquees();
   magnets();
-  cursor();
   menuRoll();
   // Заголовки ділимо на рядки після завантаження шрифтів
   (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {
@@ -544,13 +538,8 @@ try {
   console.error('Анімації вимкнено:', err);
   showAll();
   document.querySelector('[data-hero-intro]')?.classList.add('is-in');
+  document.querySelector('[data-hero-scene]')?.classList.add('is-fallback', 'is-ready');
   motion.ready = true;
 }
 
-// Після першого відображення: коли браузер вільний (або щонайпізніше за 1.5 с після завантаження)
-const afterPaint = (fn) => {
-  const go = () => ('requestIdleCallback' in window ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 200));
-  if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });
-};
-if (!motion.heroReady) afterPaint(heroScene);
 if (ScrollTrigger) addEventListener('load', () => ScrollTrigger.refresh());
