@@ -89,6 +89,12 @@ export function layout({ title, description, path: current = '/', body, bodyClas
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Перший скрипт сторінки, до будь-якого CSS: стартові приховані стани анімацій (site.css) діють з першого кадру.
+       js — сторінку обслуговує JavaScript; wr-anim — приховані стани анімацій;
+       wr-intro — інтро при першому вході в цій сесії (не з prefers-reduced-motion);
+       vt-in — сторінку відкрито через View Transition (ставить pagereveal; motion.js чекає window.wrRevealed);
+       якщо motion.js за 2,5 с не запустився, wr-anim і wr-intro знімаються і весь вміст видно без анімації. -->
+  <script>(function(d,w){d.classList.add('js','wr-anim');try{if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&!sessionStorage.getItem('wr_intro')){d.classList.add('wr-intro');sessionStorage.setItem('wr_intro','1')}}catch(e){}w.wrRevealed=new Promise(function(r){if(!('onpagereveal' in w))return r();w.addEventListener('pagereveal',function(e){if(e.viewTransition)d.classList.add('vt-in');r()},{once:true});setTimeout(r,1500)});setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.ready))d.classList.remove('wr-anim','wr-intro')},2500)})(document.documentElement,window)</script>
   <title>${fullTitle}</title>
   <meta name="description" content="${desc}">
   <meta name="theme-color" content="#111111">
@@ -102,13 +108,11 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter+Tight:wght@800;900&family=Inter:wght@400;500;600;700&display=swap">
-  <!-- js — сторінку обслуговує JavaScript; wr-anim — стартові приховані стани анімацій (site.css);
-       wr-intro — інтро при першому вході в цій сесії (не з prefers-reduced-motion);
-       vt-in — сторінку відкрито через View Transition (заголовок уже на місці, без повторної появи).
-       Якщо motion.js за 4 с не запустився, wr-anim і wr-intro знімаються і весь вміст видно. -->
-  <script>(function(d){d.classList.add('js','wr-anim');try{if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&!sessionStorage.getItem('wr_intro')){d.classList.add('wr-intro');sessionStorage.setItem('wr_intro','1')}}catch(e){}addEventListener('pagereveal',function(e){if(e.viewTransition)d.classList.add('vt-in')});setTimeout(function(){if(!(window.wrMotion&&window.wrMotion.ready))d.classList.remove('wr-anim','wr-intro')},4000)})(document.documentElement)</script>
   <link rel="stylesheet" href="${asset('vendor/lenis-1.3.27.css')}">
   <link rel="stylesheet" href="${asset('css/site.css')}">
+  ${current === '/' ? raw(`<link rel="modulepreload" href="/assets/js/hero3d.js">
+  <link rel="modulepreload" href="/assets/vendor/three.module-0.187.0.min.js">
+  <link rel="modulepreload" href="/assets/vendor/three.core-0.187.0.min.js">`) : ''}
   ${analyticsHead(s)}
 </head>
 <body class="${bodyClass}">

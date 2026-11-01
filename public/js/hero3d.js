@@ -12,7 +12,10 @@
      • оточення для відблисків — власне градієнтне (PMREM), без HDR-файлів;
      • світло — рожеве #FF2E9A і ціанове #00E5FF з різних боків.
 
-   createHeroScene(host) повертає об'єкт стану. motion.js:
+   createHeroScene(host) — асинхронна: важкі кроки (WebGL-контекст, оточення, геометрія, компіляція шейдерів)
+   ідуть окремими задачами з паузами між ними, щоб жодна не блокувала сторінку надовго;
+   шейдери компілюються через renderer.compileAsync (паралельно, якщо браузер це вміє).
+   Повертає об'єкт стану. motion.js:
      • прив'язує скрол першого екрана (setScroll, useScroll);
      • переносить canvas в інший контейнер (attach) — так скульптура супроводжує секцію «Як це працює»;
      • задає «настрій» (setMood): сила хвилювання, дрібна брижа, швидкість обертання, зсув і масштаб.
@@ -134,8 +137,9 @@ function makeBackdrop() {
   );
 }
 
-/* Оточення для відблисків: темна «кімната» з рожевим і ціановим світлом і двома білими софтбоксами */
-function makeEnvironment(renderer) {
+/* Оточення для відблисків: темна «кімната» з рожевим і ціановим світлом і двома білими софтбоксами.
+   Шейдери кімнати й розмиття PMREM спершу компілюються асинхронно — сама генерація тоді коротка. */
+async function makeEnvironment(renderer) {
   const env = new THREE.Scene();
   const room = new THREE.Mesh(
     new THREE.SphereGeometry(10, 48, 24),
@@ -159,14 +163,26 @@ function makeEnvironment(renderer) {
   );
   env.add(room);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const rt = pmrem.fromScene(env, 0.02);
+  try {
+    if (renderer.compileAsync) await renderer.compileAsync(env, new THREE.PerspectiveCamera());
+    pmrem.compileCubemapShader();
+  } catch { /* скомпілюється під час генерації */ }
+  await yieldToMain();
+  // 128 px на грань замість типових 256: відблиски однаково розмиті, а генерація вчетверо легша
+  const rt = pmrem.fromScene(env, 0.02, 0.1, 100, { size: 128 });
   pmrem.dispose();
   room.geometry.dispose();
   room.material.dispose();
   return rt.texture;
 }
 
-export function createHeroScene(host, { mobile = false, weak = false } = {}) {
+// Віддати керування браузеру між важкими кроками (кадр, клік, прокрутка встигають обробитися)
+const yieldToMain = () => new Promise((resolve) => {
+  if (window.scheduler?.yield) window.scheduler.yield().then(resolve);
+  else setTimeout(resolve, 0);
+});
+
+export async function createHeroScene(host, { mobile = false, weak = false } = {}) {
   const canvas = document.createElement('canvas');
   canvas.setAttribute('aria-hidden', 'true');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile && !weak, alpha: false, powerPreference: 'high-performance' });
@@ -176,9 +192,11 @@ export function createHeroScene(host, { mobile = false, weak = false } = {}) {
   renderer.toneMappingExposure = 1.05;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   host.appendChild(canvas);
+  await yieldToMain();
 
   const scene = new THREE.Scene();
-  scene.environment = makeEnvironment(renderer);
+  scene.environment = await makeEnvironment(renderer);
+  await yieldToMain();
   const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
   camera.position.set(0, 0, 7);
 
@@ -246,6 +264,7 @@ export function createHeroScene(host, { mobile = false, weak = false } = {}) {
   const group = new THREE.Group();
   group.add(mesh);
   scene.add(group);
+  await yieldToMain();
 
   /* ---------- Стан (його читає й змінює motion.js) ---------- */
   // Настрій за замовчуванням: amp — хвилювання, detail — дрібна брижа, spin — обертання (рад/с),
@@ -383,6 +402,13 @@ export function createHeroScene(host, { mobile = false, weak = false } = {}) {
     backdrop.material.uniforms.uTime.value = time;
     renderer.render(scene, camera);
   }
+
+  // Шейдери (найдорожчий — скло з transmission) компілюємо заздалегідь і, якщо можна, паралельно
+  try {
+    if (renderer.compileAsync) await renderer.compileAsync(scene, camera);
+    else renderer.compile(scene, camera);
+  } catch { /* компіляція відбудеться під час першого кадру */ }
+  await yieldToMain();
 
   state.start = () => { if (!state.running) { state.running = true; last = performance.now(); raf = requestAnimationFrame(frame); } };
   state.stop = () => { state.running = false; cancelAnimationFrame(raf); raf = 0; };

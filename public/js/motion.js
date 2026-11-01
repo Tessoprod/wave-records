@@ -20,8 +20,12 @@ const wide = matchMedia('(min-width: 861px)').matches;
 const EASE = 'expo.out';
 const SOFT = 'power3.out';
 const motion = window.wrMotion = { gsap, ScrollTrigger, SplitText, lenis: null, reduceMotion, hero: null, heroReady: null, introDone: Promise.resolve(), stepMood: null, ready: false };
-// Сторінку відкрито через View Transition: заголовок уже перетік на місце, повторно його не анімуємо
+// Сторінку відкрито через View Transition: заголовок уже перетік на місце, повторно його не анімуємо.
+// Клас vt-in ставить обробник pagereveal у <head>; motion.js може запуститися раніше за цю подію,
+// тому рішення приймаємо лише після window.wrRevealed (інакше заголовок мигне: фінальний → прихований → анімація).
 const cameByTransition = () => root.classList.contains('vt-in');
+const revealed = window.wrRevealed || Promise.resolve();
+const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
 
 /* ---------- Плавний скрол ---------- */
 function smoothScroll() {
@@ -141,9 +145,16 @@ function servicesStage() {
       anticipatePin: 1,
       invalidateOnRefresh: true,
       onUpdate: (st) => {
-        motion.hero?.setScroll(Math.min(1, st.progress * 1.4));
-        svc.classList.toggle('is-placed', st.progress > 0.9);
-        if (inner) inner.style.pointerEvents = st.progress > 0.2 ? 'none' : '';
+        const p = st.progress;
+        motion.hero?.setScroll(Math.min(1, p * 1.4));
+        // Перший екран (текст, кнопки, «Scroll») — повністю прихований і не перехоплює кліки, щойно текст згас;
+        // при прокрутці назад повертається і знову клікабельний
+        hero.classList.toggle('is-covered', p > 0.34);
+        // Картки клікабельні, щойно доїхали на місця (а не лише наприкінці закріплення)
+        svc.classList.toggle('is-placed', p > 0.62);
+        // 3D-сцена наприкінці згасає (autoAlpha у таймлайні) — тоді не рендеримо її
+        const hidden = p > 0.99;
+        if (hidden !== motion.heroCovered) { motion.heroCovered = hidden; motion.heroSync?.(); }
       },
     },
   });
@@ -156,6 +167,9 @@ function servicesStage() {
   // …і каскадом розходяться на свої місця
     .to(items, { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out', stagger: 0.07 }, 0.32)
     .fromTo(head, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.3, ease: 'power3.out', stagger: 0.06 }, 0.34);
+  // Наприкінці 3D-сцена першого екрана згасає повністю (opacity 0 + visibility: hidden)
+  const scene = hero.querySelector('[data-hero-scene]');
+  if (scene) tl.fromTo(scene, { autoAlpha: 1 }, { autoAlpha: 0, duration: 0.25, ease: 'power1.in' }, 0.75);
 
   // «Scroll» веде одразу в кінець анімації, де картки вже на місцях
   hint?.addEventListener('click', (e) => {
@@ -544,44 +558,39 @@ function intro() {
   });
 }
 
-/* Поява першого екрана: текст і 3D-сцена проявляються разом, однією анімацією.
-   Чекаємо шрифти, інтро і готовність сцени (кілька вже анімованих кадрів або рішення про статичний кадр),
-   але не довше 3 с — тоді текст з'являється, а сцена проявиться, щойно буде готова.
-   Літери WAVE RECORDS виїжджають знизу, далі підзаголовок і кнопки. */
+/* Поява першого екрана: текст і кнопки з'являються одразу після шрифтів (і інтро), не чекаючи 3D.
+   3D-сцена ініціалізується після першої відмальовки і плавно проявляється, коли вже відрендерила
+   кілька анімованих кадрів (без статичного кадру). Літери WAVE RECORDS виїжджають знизу, далі решта. */
 function heroIntro() {
   const intro = document.querySelector('[data-hero-intro]');
   const host = document.querySelector('[data-hero-scene]');
   const revealScene = () => host?.classList.add('is-ready');
   if (!intro) { motion.heroReady?.then(revealScene); return; }
   const show = () => intro.classList.add('is-in');
-  if (!gsap || reduceMotion || cameByTransition()) { show(); motion.heroReady?.then(revealScene); return; }
+  motion.heroReady?.then(revealScene);
+  if (!gsap || reduceMotion) { show(); return; }
   const line1 = intro.querySelector('.hero-l1');
   const rest = intro.querySelectorAll('.hero-l2, .hero-sub, .hero-ctas');
   const run = () => {
     show();
-    // Сцена проявляється в той самий момент, що й текст (або щойно буде готова, якщо ще ні)
-    motion.heroReady?.then(revealScene);
+    if (cameByTransition()) return; // перехід уже показав перший екран
     const split = SplitText && line1 ? SplitText.create(line1, { type: 'chars', mask: 'chars' }) : null;
     const tl = gsap.timeline({ defaults: { ease: EASE }, onComplete: () => split?.revert() });
     if (split) tl.from(split.chars, { yPercent: 110, duration: 1.2, stagger: 0.035 });
     else if (line1) tl.from(line1, { y: 40, opacity: 0, duration: 1.1 });
     tl.from(rest, { y: 28, opacity: 0, duration: 1, stagger: 0.1 }, split ? 0.35 : 0.2);
   };
-  // Літери ділимо після завантаження шрифтів (інакше їхня ширина буде хибною), після інтро й готовності сцени
-  const sceneOrTimeout = Promise.race([motion.heroReady || Promise.resolve(), new Promise((r) => setTimeout(r, 3000))]);
-  Promise.all([document.fonts ? document.fonts.ready : null, motion.introDone, sceneOrTimeout]).then(run);
+  // Літери ділимо після завантаження шрифтів (інакше їхня ширина буде хибною), після інтро і pagereveal
+  Promise.all([fontsReady, motion.introDone, revealed]).then(run);
 }
 
 /* 3D-скульптура (public/js/hero3d.js): на першому екрані, а на комп'ютері ще й у секції «Як це працює».
    three.js вантажиться лише тут, динамічним import(), одразу після запуску motion.js.
    Проміс завершується, коли сцена вже відрендерила кілька анімованих кадрів (canvas ще прихований),
    або коли вирішено показати статичний кадр (без WebGL, prefers-reduced-motion, помилка). */
-function hasWebGL() {
-  try {
-    const c = document.createElement('canvas');
-    return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl')));
-  } catch { return false; }
-}
+// Лише перевірка наявності API: окремий пробний WebGL-контекст коштує стільки ж, скільки справжній
+// (сотні мілісекунд на слабких пристроях). Якщо контекст не створиться, createHeroScene кине помилку → статичний кадр.
+const hasWebGL = () => !!window.WebGLRenderingContext;
 async function heroScene() {
   const host = document.querySelector('[data-hero-scene]');
   if (!host) return;
@@ -593,7 +602,7 @@ async function heroScene() {
   let hero;
   try {
     const { createHeroScene } = await import('./hero3d.js');
-    hero = createHeroScene(host, { mobile, weak });
+    hero = await createHeroScene(host, { mobile, weak });
   } catch (err) {
     console.warn('3D-сцена недоступна, лишаю статичний кадр', err);
     fallback();
@@ -615,9 +624,11 @@ async function heroScene() {
       hero.useScroll = false;
       hero.setMood(motion.stepMood || STEP_MOODS[0]);
     }
-    // Рендер лише коли скульптуру видно і вкладка активна
-    (heroVisible || (stepsVisible && stepsHost)) && !document.hidden ? hero.start() : hero.stop();
+    // Рендер лише коли скульптуру видно (перший екран не прихований Послугами) і вкладка активна
+    const onHero = heroVisible && !motion.heroCovered;
+    (onHero || (stepsVisible && stepsHost)) && !document.hidden ? hero.start() : hero.stop();
   };
+  motion.heroSync = sync;
   new IntersectionObserver(([en]) => { heroVisible = en.isIntersecting; sync(); }).observe(host);
   if (stepsHost) new IntersectionObserver(([en]) => { stepsVisible = en.isIntersecting; sync(); }).observe(stepsHost);
   document.addEventListener('visibilitychange', sync);
@@ -649,6 +660,38 @@ async function heroScene() {
 }
 
 /* ---------- Запуск ---------- */
+// Після першої відмальовки, коли браузер вільний (запасний варіант — setTimeout)
+function afterFirstPaint() {
+  return revealed.then(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(() => {
+    if ('requestIdleCallback' in window) requestIdleCallback(resolve, { timeout: 700 }); else setTimeout(resolve, 120);
+  }, 0))));
+}
+
+/* Логотип: на головній — плавно нагору без перезавантаження; при наведенні на посилання на головну
+   заздалегідь вантажимо сторінку і модулі three.js, щоб перехід був миттєвим */
+function homeLinks() {
+  const home = (a) => a && a.origin === location.origin && /\/$/.test(a.pathname) && document.querySelector('.site-header .logo')?.pathname === a.pathname;
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!home(a) || a.pathname !== location.pathname || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+    e.preventDefault();
+    if (document.body.classList.contains('menu-open')) document.querySelector('[data-menu-toggle]')?.click();
+    if (motion.lenis) motion.lenis.scrollTo(0, { duration: 1.2 });
+    else scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  });
+  let warmed = false;
+  const warm = (e) => {
+    const a = e.target.closest?.('a');
+    if (warmed || !home(a) || a.pathname === location.pathname) return;
+    warmed = true;
+    const add = (rel, href, as) => { const l = document.createElement('link'); l.rel = rel; l.href = href; if (as) l.as = as; document.head.appendChild(l); };
+    add('prefetch', a.href, 'document');
+    for (const m of ['./hero3d.js', '../vendor/three.module-0.187.0.min.js', '../vendor/three.core-0.187.0.min.js']) add('modulepreload', new URL(m, import.meta.url).href.replace(/\?.*$/, ''));
+  };
+  addEventListener('pointerover', warm, { passive: true });
+  addEventListener('focusin', warm);
+}
+
 function showAll() {
   root.classList.remove('wr-anim', 'wr-intro');
   document.querySelector('[data-intro]')?.remove();
@@ -657,10 +700,14 @@ try {
   if (!gsap || !ScrollTrigger) throw new Error('GSAP не завантажився');
   gsap.registerPlugin(...[ScrollTrigger, SplitText].filter(Boolean));
   smoothScroll();
-  // 3D-сцена вантажиться одразу: перший екран чекає на неї, щоб текст і сцена з'явилися разом
-  // (під час інтро лічильник показує саме її завантаження)
+  homeLinks();
+  // 3D-сцена: під час інтро вантажиться одразу (лічильник показує її завантаження), інакше — після першої
+  // відмальовки, коли браузер вільний: текст і кнопки з'являються без затримки, сцена проявляється пізніше
   const sceneHost = document.querySelector('[data-hero-scene]');
-  if (sceneHost) motion.heroReady = heroScene().catch(() => sceneHost.classList.add('is-fallback'));
+  if (sceneHost) {
+    const start = () => heroScene().catch(() => sceneHost.classList.add('is-fallback'));
+    motion.heroReady = root.classList.contains('wr-intro') ? start() : afterFirstPaint().then(start);
+  }
   motion.introDone = intro();
   heroIntro();
   scrollHint();
@@ -672,8 +719,8 @@ try {
   magnets();
   menuWave();
   logoEq();
-  // Заголовки ділимо на рядки після завантаження шрифтів
-  (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {
+  // Заголовки ділимо на рядки після завантаження шрифтів і pagereveal (щоб знати, чи прийшли через перехід)
+  Promise.all([fontsReady, revealed]).then(() => {
     try { headings(); } catch (err) { console.error(err); showAll(); }
     ScrollTrigger.sort();
     ScrollTrigger.refresh();

@@ -435,11 +435,11 @@ main { display: block; }
 .hero-scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1s var(--ease); }
 .hero-scene.is-ready canvas { opacity: 1; }
 html.js .hero-scene:not(.is-ready) { background: var(--black); }
-html.js .hero-scene::before { opacity: 0; transition: opacity 1s var(--ease); animation: hero-failsafe .6s 4s forwards; }
+html.js .hero-scene::before { opacity: 0; transition: opacity 1s var(--ease); animation: hero-failsafe .6s 2.5s forwards; }
 html.js .hero-scene.is-ready::before { animation: none; }
 html.js .hero-scene.is-fallback.is-ready::before { opacity: 1; }
 /* Поява заголовка: motion.js анімує його й ставить .is-in; якщо скрипт не спрацював — текст однаково з'являється */
-html.js [data-hero-intro]:not(.is-in) { opacity: 0; animation: hero-failsafe .6s 4s forwards; }
+html.js [data-hero-intro]:not(.is-in) { opacity: 0; animation: hero-failsafe .6s 2.5s forwards; }
 @keyframes hero-failsafe { to { opacity: 1; } }
 .hero-inner { position: relative; z-index: 1; padding-bottom: clamp(32px, 5vw, 56px); display: flex; flex-direction: column; align-items: center; text-align: center; }
 /* Текст поверх скла: м'яка темна тінь, щоб читався на будь-якому відблиску */
@@ -493,6 +493,8 @@ html.stage-on .home-stage > #after-hero { display: none; }
 html.stage-on .svc-section { position: relative; z-index: 2; align-self: center; padding: var(--header-h) 0 clamp(24px, 4vh, 48px); }
 html.stage-on .svc-section:not(.is-placed) { pointer-events: none; }
 html.stage-on [data-hero-intro].is-in { opacity: calc(1 - var(--stage-out, 0)); transform: translateY(calc(var(--stage-out, 0) * -30%)); }
+/* Текст згас — перший екран повністю прихований і не перехоплює кліки (клас ставить motion.js) */
+html.stage-on .hero.is-covered :is([data-hero-intro], .scroll-hint) { visibility: hidden; pointer-events: none; opacity: 0; }
 
 .svc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .svc-grid li:nth-child(1), .svc-grid li:nth-child(6) { grid-column: span 2; }
