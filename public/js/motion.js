@@ -221,6 +221,10 @@ function marquees() {
     let boost = 0;
     let lastY = scrollY;
     let visible = false;
+    // Ширину одного набору слів міряємо лише при зміні розміру, а не щокадру
+    let w = set.offsetWidth;
+    addEventListener('resize', () => { w = set.offsetWidth; }, { passive: true });
+    if (document.fonts) document.fonts.ready.then(() => { w = set.offsetWidth; });
     new IntersectionObserver(([en]) => { visible = en.isIntersecting; }).observe(m);
     gsap.ticker.add((time, deltaMs) => {
       const dt = Math.min(0.05, deltaMs / 1000);
@@ -229,7 +233,6 @@ function marquees() {
       if (!visible) return;
       if (v > 5) dir = -1; else if (v < -5) dir = 1;
       boost += (Math.min(Math.abs(v) * 0.35, 900) - boost) * Math.min(1, dt * 6);
-      const w = set.offsetWidth;
       x += dir * (60 + boost) * dt;
       if (x <= -w) x += w;
       if (x > 0) x -= w;
@@ -258,10 +261,10 @@ function cursor() {
   const c = document.createElement('div');
   c.className = 'cursor';
   c.setAttribute('aria-hidden', 'true');
-  c.innerHTML = '<span class="cursor-label"></span>';
+  c.innerHTML = '<span class="cursor-dot"></span><span class="cursor-label"></span>';
   document.body.appendChild(c);
   root.classList.add('has-cursor');
-  const label = c.firstElementChild;
+  const label = c.querySelector('.cursor-label');
   gsap.set(c, { xPercent: -50, yPercent: -50 });
   const xTo = gsap.quickTo(c, 'x', { duration: 0.35, ease: SOFT });
   const yTo = gsap.quickTo(c, 'y', { duration: 0.35, ease: SOFT });

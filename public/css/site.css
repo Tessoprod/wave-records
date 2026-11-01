@@ -84,13 +84,15 @@ h1, h2, h3, h4 { margin: 0; }
 [hidden] { display: none !important; }
 
 :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 8px; }
+/* Усередині контейнерів з overflow: hidden (рядки меню, клітинки галереї) рамку фокуса малюємо всередині, щоб її не обрізало */
+.menu-links a:focus-visible, .g-open:focus-visible, .track-wave:focus-visible { outline-offset: -3px; }
 
 .skip {
-  position: absolute; left: 16px; top: -60px; z-index: 100;
+  position: absolute; left: 16px; top: 16px; z-index: 210;
   background: var(--white); color: var(--black); padding: 10px 16px; border-radius: var(--r-pill);
-  font-weight: 600; text-decoration: none; transition: top .2s;
+  font-weight: 600; text-decoration: none; transform: translateY(-80px); transition: transform .2s;
 }
-.skip:focus { top: 16px; }
+.skip:focus { transform: none; }
 
 .container { width: min(var(--maxw), 100% - 2 * var(--gutter)); margin-inline: auto; }
 .muted { color: var(--ink-3); }
@@ -234,7 +236,8 @@ html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn
   /* Білий текст на рожевому не проходить за контрастом — текст темний */
   color: var(--black);
   overflow: hidden;
-  background: radial-gradient(130% 160% at 28% 0%, #ff8cc8 0%, var(--pink) 48%, #e01a85 100%);
+  /* Темний край градієнта не темніший за #ec2593 — темний текст на кнопці має контраст ≥ 4.5 (WCAG AA) */
+  background: radial-gradient(130% 160% at 28% 0%, #ff8cc8 0%, var(--pink) 48%, #ec2593 100%);
   border-color: rgba(255, 190, 225, .45);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, .5),
@@ -320,11 +323,12 @@ html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn
 .header-actions { display: flex; align-items: center; gap: 8px; }
 .menu-toggle { gap: 12px; }
 .burger { position: relative; width: 18px; height: 12px; display: inline-block; }
-.burger i { position: absolute; left: 0; right: 0; height: 2px; border-radius: 2px; background: currentColor; transition: transform .35s var(--ease), top .35s var(--ease); }
+.burger i { position: absolute; left: 0; right: 0; height: 2px; border-radius: 2px; background: currentColor; transition: transform .35s var(--ease); }
 .burger i:first-child { top: 2px; }
 .burger i:last-child { top: 8px; }
-[aria-expanded="true"] .burger i:first-child { top: 5px; transform: rotate(45deg); }
-[aria-expanded="true"] .burger i:last-child { top: 5px; transform: rotate(-45deg); }
+/* Хрестик — лише transform: лінії зсуваються до центру й повертаються */
+[aria-expanded="true"] .burger i:first-child { transform: translateY(3px) rotate(45deg); }
+[aria-expanded="true"] .burger i:last-child { transform: translateY(-3px) rotate(-45deg); }
 
 /* ---------- Меню ---------- */
 
@@ -794,7 +798,8 @@ html.wr-anim .timeline { --tl-p: 0; }
 .step { transition: opacity .5s var(--ease); }
 .step-dot { transition: background-color .4s var(--ease), box-shadow .4s var(--ease); }
 .step-title { text-shadow: 0 2px 24px rgba(17, 17, 17, .7); }
-html.wr-anim .step:not(.is-on) { opacity: .38; }
+/* Неактивні кроки приглушені, але текст лишається контрастним (≈ 4.9:1, WCAG AA) */
+html.wr-anim .step:not(.is-on) { opacity: .5; }
 html.wr-anim .step:first-child:not(.is-on) .step-dot { background: var(--black); box-shadow: none; }
 .step.is-on .step-dot { background: var(--pink); }
 .step.is-current .step-dot { box-shadow: 0 0 22px rgba(var(--pink-rgb), .35); }
@@ -823,14 +828,16 @@ html.has-cursor, html.has-cursor * { cursor: none !important; }
 html.has-cursor :is(input, textarea, select, iframe, [contenteditable="true"]) { cursor: auto !important; }
 .cursor {
   position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none;
-  width: 14px; height: 14px; border-radius: 50%; background: #fff; mix-blend-mode: difference;
+  width: 86px; height: 86px; mix-blend-mode: difference;
   display: grid; place-items: center; opacity: 0;
-  transition: width .4s var(--ease), height .4s var(--ease), opacity .25s var(--ease);
+  transition: opacity .25s var(--ease);
 }
+/* Коло змінює розмір лише через transform: scale (14 → 46 → 86 px) */
+.cursor-dot { position: absolute; inset: 0; border-radius: 50%; background: #fff; transform: scale(.163); transition: transform .4s var(--ease); }
 .cursor.is-visible { opacity: 1; }
-.cursor.is-link { width: 46px; height: 46px; }
-.cursor.is-label { width: 86px; height: 86px; }
-.cursor-label { font: 700 12px/1 var(--font-text); letter-spacing: .08em; text-transform: uppercase; color: #000; opacity: 0; transition: opacity .2s; white-space: nowrap; }
+.cursor.is-link .cursor-dot { transform: scale(.535); }
+.cursor.is-label .cursor-dot { transform: none; }
+.cursor-label { position: relative; font: 700 12px/1 var(--font-text); letter-spacing: .08em; text-transform: uppercase; color: #000; opacity: 0; transition: opacity .2s; white-space: nowrap; }
 .cursor.is-label .cursor-label { opacity: 1; }
 
 /* ---------- Інтро при першому вході (анімацію веде motion.js) ----------

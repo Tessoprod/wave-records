@@ -240,7 +240,8 @@ export function createHeroScene(host, { mobile = false, weak = false } = {}) {
         #endif`)
       .replace('#include <begin_vertex>', 'vec3 transformed = wrP0;');
   };
-  const detail = weak ? 28 : mobile ? 40 : 72;
+  // Деталізація: телефон ≈ 50 тис. вершин, слабкий пристрій ≈ 26 тис., комп'ютер ≈ 320 тис.
+  const detail = weak ? 20 : mobile ? 28 : 72;
   const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, detail), material);
   const group = new THREE.Group();
   group.add(mesh);

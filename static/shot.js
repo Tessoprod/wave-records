@@ -11,6 +11,7 @@
 // --cookies  — не ховати банер cookies.
 // --tag=X    — префікс назви файлу: _shots/X-about-390.png.
 // --hover=S  — навести мишу на перший елемент за CSS-селектором S (стан наведення); з --full не поєднується.
+// --intro    — показати інтро першого входу (за замовчуванням воно пропускається, щоб знімати саму сторінку).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -86,6 +87,8 @@ try {
     }
   };
   await send('Page.enable');
+  // Інтро показується раз на сесію — позначаємо, що вже бачили, щоб знімати саму сторінку
+  if (!flag('intro')) await send('Page.addScriptToEvaluateOnNewDocument', { source: "try { sessionStorage.setItem('wr_intro', '1') } catch (e) {}" });
   fs.mkdirSync(OUT, { recursive: true });
 
   for (const width of widths) {
