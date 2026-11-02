@@ -128,7 +128,7 @@ function headings() {
 }
 // Вміст без власної анімації (текст юридичних сторінок, кнопки, фото, футер) — м'яке проявлення.
 // Прозорість лишається вбудованою (opacity: 1): інакше знову спрацює приховане правило з site.css
-const PLAIN = 'main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn, .section-steps .steps, .steps-cta, .marquee, .book-help, .faq-nav, .faq-group-title, .faq-help, .site-footer';
+const PLAIN = 'main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn, .section-steps .steps, .steps-cta, .marquee, .book-help, .faq-nav, .faq-group-title, .faq-help, .faq-home-ctas, .site-footer';
 function plainFade() {
   // Блок Послуг на головній (сцена з закріпленням) проявляє сама сцена — тут його не чіпаємо
   $$(PLAIN).filter((el) => !(motion.stage && el.closest('.svc-section'))).forEach((el) => {
@@ -167,7 +167,8 @@ function heroFadeStandalone() {
    Перший екран закріплюється (pin + scrub, синхронно з Lenis). Під час прокрутки текст іде вгору й згасає,
    3D-сцена віддаляється, а з центру екрана виїжджають картки послуг: спершу купкою, зменшені, напівпрозорі
    й розмиті, потім каскадом розходяться на свої місця; заголовок проявляється разом із ними.
-   Щойно всі картки на місцях — закріплення знімається. Лише широкий екран (від 1101 px), де Послуги
+   Щойно всі картки на місцях (мітка settled), закріплення триває ще ~0,5 екрана — «стопор»: картки нерухомі,
+   стають клікабельними, по краях пробігає відблиск; прокрутка м'яко примагнічується до settled. Лише широкий екран (від 1101 px), де Послуги
    вміщаються в один екран; на телефоні й при prefers-reduced-motion — звичайна поява (blocks()). */
 function servicesStage() {
   const stage = document.querySelector('[data-stage]');
@@ -188,25 +189,42 @@ function servicesStage() {
   const toCenterX = (i, el) => innerWidth / 2 - pos(el).x + (i - (items.length - 1) / 2) * 6;
   const toCenterY = (i, el) => innerHeight / 2 - pos(el).y + (i % 2 ? 5 : -5);
 
+  // Довжина закріплення: BASE екрана — поява карток, PAUSE — «стопор»: картки вже на місцях і нерухомі
+  const BASE = 1.3;
+  const PAUSE = 0.5;
+  const SCENE_GONE = 1; // час таймлайну, коли 3D-сцена згасла повністю (fromTo нижче: 0.75 + 0.25)
+  let placedAt = Infinity;
+  let settled = false;
   const tl = gsap.timeline({
     defaults: { ease: 'none' },
     scrollTrigger: {
       trigger: stage,
       start: 'top top',
-      end: () => `+=${Math.round(innerHeight * 1.3)}`,
+      end: () => `+=${Math.round(innerHeight * (BASE + PAUSE))}`,
       pin: true,
       scrub: 0.8,
       anticipatePin: 1,
       invalidateOnRefresh: true,
-      onUpdate: (st) => {
-        const p = st.progress;
-        motion.hero?.setScroll(Math.min(1, p * 1.4));
-        // Картки клікабельні, щойно доїхали на місця (а не лише наприкінці закріплення)
-        svc.classList.toggle('is-placed', p > 0.62);
-        // 3D-сцена наприкінці згасає (autoAlpha у таймлайні) — тоді не рендеримо її
-        const hidden = p > 0.99;
-        if (hidden !== motion.heroCovered) { motion.heroCovered = hidden; motion.heroSync?.(); }
-      },
+      onUpdate: (st) => motion.hero?.setScroll(Math.min(1, st.progress * 1.4 * (BASE + PAUSE) / BASE)),
+    },
+    // Стан карток беремо з самого таймлайну (зі згладжуванням scrub), а не з прокрутки: клікабельні лише тоді,
+    // коли справді стали на місця (мітка settled)
+    onUpdate: () => {
+      const now = tl.time() >= placedAt - 0.001;
+      if (now !== settled) {
+        settled = now;
+        svc.classList.toggle('is-placed', now);
+        if (now && !reduceMotion) {
+          // Сигнал «картки активні»: по краях коротко пробігає ледь помітний відблиск (один раз)
+          svc.classList.remove('is-glint');
+          void svc.offsetWidth;
+          svc.classList.add('is-glint');
+          setTimeout(() => svc.classList.remove('is-glint'), 1000);
+        }
+      }
+      // 3D-сцена наприкінці згасає (autoAlpha у таймлайні) — тоді не рендеримо її
+      const hidden = tl.time() >= SCENE_GONE - 0.001;
+      if (hidden !== motion.heroCovered) { motion.heroCovered = hidden; motion.heroSync?.(); }
     },
   });
   // Заголовок і кнопки першого екрана плавно йдуть угору й згасають у першій половині появи карток
@@ -221,6 +239,15 @@ function servicesStage() {
   // Наприкінці 3D-сцена першого екрана згасає повністю (opacity 0 + visibility: hidden)
   const scene = hero.querySelector('[data-hero-scene]');
   if (scene) tl.fromTo(scene, { autoAlpha: 1 }, { autoAlpha: 0, duration: 0.25, ease: 'power1.in' }, 0.75);
+  // Картки на місцях — мітка settled; далі порожній відрізок (пауза), поки закріплення ще триває
+  placedAt = tl.duration();
+  tl.addLabel('settled', placedAt);
+  tl.to({}, { duration: placedAt * PAUSE / BASE });
+  // М'яке примагнічування до settled: коли прокрутка зупинилась поблизу — доводимо точно до карток
+  magnetTo(() => {
+    const st = tl.scrollTrigger;
+    return st.start + (st.end - st.start) * (placedAt / tl.duration());
+  }, () => innerHeight * 0.22, 0.5);
 
   // «Scroll» веде одразу в кінець анімації, де картки вже на місцях
   hint?.addEventListener('click', (e) => {
@@ -230,6 +257,43 @@ function servicesStage() {
     if (motion.lenis) motion.lenis.scrollTo(end); else scrollTo({ top: end, behavior: 'smooth' });
   });
   return true;
+}
+
+/* М'яке примагнічування прокрутки до точки (синхронно з Lenis): коли прокрутка зупинилась на відстані до range()
+   від target(), за duration с плавно доводимо до неї. Не блокує: далі можна гортати в будь-який бік. */
+function magnetTo(target, range, duration) {
+  if (reduceMotion) return;
+  let idle = 0;
+  let busy = false;
+  const ease = (t) => 1 - Math.pow(1 - t, 3);
+  const check = () => {
+    if (busy || document.body.classList.contains('menu-open')) return;
+    const y = target();
+    const d = y - scrollY;
+    if (Math.abs(d) < 2 || Math.abs(d) > range()) return;
+    busy = true;
+    const done = () => { busy = false; };
+    if (motion.lenis) motion.lenis.scrollTo(y, { duration, easing: ease, onComplete: done });
+    else { scrollTo({ top: y, behavior: 'smooth' }); setTimeout(done, duration * 1000); }
+  };
+  const onScroll = () => { if (busy) return; clearTimeout(idle); idle = setTimeout(check, 160); };
+  if (motion.lenis) motion.lenis.on('scroll', onScroll); else addEventListener('scroll', onScroll, { passive: true });
+}
+
+/* Головна без сцени (телефон, планшет): коротка пауза на Послугах — секція закріплюється на ~30 % висоти екрана,
+   прокрутка м'яко примагнічується до її початку. Без prefers-reduced-motion. */
+function servicesPause() {
+  const svc = document.querySelector('[data-stage] .svc-section');
+  if (!svc || reduceMotion) return;
+  const top = () => (document.querySelector('.site-header')?.offsetHeight || 0) + 8;
+  const st = ScrollTrigger.create({
+    trigger: svc,
+    start: () => `top top+=${top()}`,
+    end: () => `+=${Math.round(innerHeight * 0.3)}`,
+    pin: true,
+    invalidateOnRefresh: true,
+  });
+  magnetTo(() => st.start, () => innerHeight * 0.12, 0.6);
 }
 
 /* ---------- 2. Картки, треки, номери ---------- */
@@ -879,7 +943,7 @@ try {
   scrollHint();
   // Сцена Послуг і згасання першого екрана лише задають стани, прив'язані до прокрутки (без появи)
   motion.stage = servicesStage();
-  if (!motion.stage) heroFadeStandalone();
+  if (!motion.stage) { heroFadeStandalone(); servicesPause(); }
   marquees();
   magnets();
   menuWave();

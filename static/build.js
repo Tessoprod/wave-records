@@ -187,6 +187,9 @@ async function main() {
     id: i + 1, slug: '', name: String(s.name || ''), price_label: String(s.price || ''), description: String(s.description || ''),
     home_title: String(s.name || ''), home_price: String(s.price || ''), bookable: bookable ? 1 : 0,
     category: bookable ? 'sound' : 'media',
+    // Якір картки на сторінці Послуг (id) і посилання з головної на цю картку (link → /services#link)
+    anchor: /^[a-z0-9-]+$/i.test(s.id || '') ? s.id : '',
+    link: /^[a-z0-9-]+$/i.test(s.link || '') ? s.link : '',
   });
   const homeServices = (services.home || []).map((s, i) => row(s, i, s.button !== 'services'));
   const sound = (services.sound || []).map((s, i) => row(s, i, s.button !== 'telegram'));

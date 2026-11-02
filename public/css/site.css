@@ -574,6 +574,11 @@ html.stage-on .home-stage > * { grid-area: 1 / 1; }
 html.stage-on .home-stage > #after-hero { display: none; }
 html.stage-on .svc-section { position: relative; z-index: 2; align-self: center; padding: var(--header-h) 0 clamp(24px, 4vh, 48px); }
 html.stage-on .svc-section:not(.is-placed) { pointer-events: none; }
+/* Картки стали на місця (settled): один ледь помітний відблиск — смуга світла проходить крізь скло, край спалахує */
+.svc-section.is-glint .svc-card::before { animation: svc-glint .9s var(--ease) both; }
+.svc-section.is-glint .svc-card::after { animation: svc-rim .9s var(--ease) both; }
+@keyframes svc-glint { from { transform: translate3d(-32%, 0, 0); } to { transform: translate3d(32%, 0, 0); } }
+@keyframes svc-rim { 0% { opacity: 0; } 35% { opacity: .55; } 100% { opacity: 0; } }
 /* Поки картки не на місцях, порожній контейнер тексту першого екрана не перехоплює кліки (самі заголовок і кнопки
    ховає motion.js через autoAlpha, лише коли вони повністю згасли) */
 html.stage-on .hero-inner { pointer-events: none; }
@@ -928,7 +933,7 @@ html.wr-anim :is(.svc-grid, .svc-full-grid, .phil-grid, .why-grid, .bento, .book
 html.wr-anim :is(.book-embed, .cta-band, .tl-text, .empty-state) { opacity: 0; }
 /* Решта вмісту без власної анімації — проявляється слідом за назвою сторінки (plainFade у motion.js) */
 html.wr-anim :is(main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn,
-  .section-steps .steps, .steps-cta, .marquee, .book-help, .faq-nav, .faq-group-title, .faq-help, .site-footer) { opacity: 0; }
+  .section-steps .steps, .steps-cta, .marquee, .book-help, .faq-nav, .faq-group-title, .faq-help, .faq-home-ctas, .site-footer) { opacity: 0; }
 html.wr-anim .tl-media { clip-path: inset(100% 0 0 0); }
 html.wr-anim .steps { --steps-p: 0; }
 html.wr-anim .timeline { --tl-p: 0; }
@@ -1196,7 +1201,7 @@ html.wr-intro .intro {
 .faq-a { overflow: hidden; }
 .faq-wave { display: block; width: calc(100% - 48px); height: 8px; margin: 0 24px; overflow: visible; }
 .faq-wave path { fill: none; stroke: url(#faq-grad); stroke-width: 1.5; vector-effect: non-scaling-stroke; opacity: .85; }
-.faq-a-body { padding: 18px 24px 26px calc(24px + 2ch + 18px); color: var(--ink-2); font-size: 17px; line-height: 1.6; max-width: 62em; }
+.faq-a-body { padding: 18px 24px 26px calc(24px + 2ch + 18px); color: var(--ink-2); font-size: 17px; line-height: 1.6; }
 .faq-a-body p { margin: 0 0 12px; }
 .faq-a-body p:last-child, .faq-a-body ul:last-child { margin-bottom: 0; }
 .faq-a-body ul { margin: 0 0 12px; padding-left: 20px; }
@@ -1205,10 +1210,20 @@ html.wr-intro .intro {
 .faq-a-body strong { color: var(--white); font-weight: 600; }
 .faq-link { color: var(--white); text-decoration: underline; text-decoration-color: rgba(var(--cyan-rgb), .5); text-underline-offset: 3px; overflow-wrap: anywhere; transition: text-decoration-color .25s; }
 .faq-link:hover { text-decoration-color: var(--cyan); }
-/* Цитата у відповіді («> » у faq.json): тонка рожева лінія ліворуч і легка підкладка — важливе застереження */
-.faq-quote { margin: 0 0 12px; padding: 12px 16px; border-left: 2px solid var(--pink); border-radius: 0 12px 12px 0; background: rgba(var(--pink-rgb), .06); color: var(--white); }
+/* Розмітка довгих відповідей: комфортна ширина рядка, підзаголовки розділів (рядок лише з **жирного**),
+   цитата («> » у faq.json) — скляна плашка з тонкою рожевою смугою ліворуч для важливої інформації */
+.faq-a-body > * { max-width: 70ch; }
+.faq-sub { margin: 24px 0 8px; font: 600 17px/1.4 var(--font-text); color: var(--white); text-transform: none; letter-spacing: 0; }
+.faq-sub:first-child { margin-top: 0; }
+.faq-quote.glass { margin: 18px 0; padding: 14px 18px; border-left: 2px solid var(--pink); border-radius: 4px 14px 14px 4px; color: var(--white); }
 .faq-quote p { margin: 0; }
-.faq-a-body .faq-quote:last-child { margin-bottom: 0; }
+/* Кнопка до послуг — частина відповіді: під текстом, ліворуч, стримана */
+.faq-more { margin: 20px 0 0 !important; }
+.faq-svc { color: var(--ink-2); }
+.faq-svc:hover, .faq-svc:focus-visible { color: var(--white); }
+/* Блок FAQ на головній: кнопки під питаннями */
+.faq-home-ctas { margin-top: 28px; justify-content: flex-start; }
+@media (max-width: 860px) { .faq-home-ctas { flex-direction: column; align-items: stretch; } }
 
 .faq-help { margin-top: clamp(48px, 6vw, 80px); padding: clamp(28px, 4vw, 48px); }
 .faq-help-title { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(24px, 2.6vw, 36px); line-height: 1.1; margin: 0 0 12px; }

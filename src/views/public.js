@@ -100,7 +100,7 @@ export function homePage({ homeServices, tracks, faq = null }) {
       <ul class="svc-grid" role="list">
         ${homeServices.map((s) => html`
         <li>
-          <a class="svc-card glass" href="${s.bookable ? bookHref(s) : '/services'}">
+          <a class="svc-card glass" href="${s.bookable ? bookHref(s) : (s.link ? `/services#${s.link}` : '/services')}">
             <h3 class="svc-name">${s.home_title || s.name}</h3>
             <p class="svc-price">${s.home_price || s.price_label}</p>
             <span class="svc-go">${s.bookable ? 'Записатися' : 'Детальніше'}${icon.arrow}</span>
@@ -162,9 +162,12 @@ export function homePage({ homeServices, tracks, faq = null }) {
       ${FAQ_DEFS}
       <header class="sec-head">
         <h2 class="h2">${faq.title || 'Питання та відповіді'}</h2>
-        ${btn('/faq', 'Усі запитання', 'glass', icon.arrow, 'data-cta="home_faq"')}
       </header>
       <div class="faq-list">${homeFaq.map((it, i) => faqItem(it, i + 1, 'faq-home', false))}</div>
+      <div class="hero-ctas faq-home-ctas">
+        ${btn('/faq', 'Усі запитання', 'glass', icon.arrow, 'data-cta="home_faq"')}
+        ${btn('/services', 'Усі послуги', 'glass', icon.arrow, 'data-cta="home_faq_services"')}
+      </div>
     </div>
   </section>` : ''}`;
 
@@ -181,7 +184,7 @@ export function servicesPage({ sound, media }) {
       ? html`<a class="btn btn-neon btn-sm" href="${bookHref(s)}">Записатися${icon.arrow}</a>`
       : html`<a class="btn btn-glass btn-sm" href="${tg}" rel="noopener">${s.category === 'media' ? c.media_cta : 'Обговорити'}${icon.arrowUp}</a>`;
     return html`
-    <li class="svc-full glass glass-card">
+    <li class="svc-full glass glass-card" ${s.anchor ? raw(`id="${esc(s.anchor)}"`) : ''}>
       <div class="svc-full-top">
         <h3 class="svc-name">${s.name}</h3>
         <p class="svc-price">${s.price_label}</p>
@@ -576,7 +579,8 @@ function faqInline(text) {
     .replace(/https?:\/\/[^\s<\u0000]*[^\s<.,;:!?)»"'\u0000]/g, (url) => faqLinkTag(url, url.replace(/^https?:\/\//, '')));
   return out.replace(/\u0000(\d+)\u0000/g, (m, i) => links[+i]);
 }
-/** Відповідь з faq.json → HTML: абзаци через порожній рядок, списки — рядки з «- », цитати — рядки з «> ». */
+/** Відповідь з faq.json → HTML: абзаци через порожній рядок (рядки поспіль — один абзац з переносами), списки — рядки
+    з «- », цитати — рядки з «> » (скляна плашка), рядок лише з **жирного** — підзаголовок. */
 export function faqAnswer(src) {
   const out = [];
   for (const chunk of String(src || '').replace(/\r/g, '').split(/\n\s*\n/)) {
@@ -585,13 +589,15 @@ export function faqAnswer(src) {
     let quote = null;
     const flushPara = () => { if (para.length) { out.push(`<p>${para.map(faqInline).join('<br>')}</p>`); para = []; } };
     const flushList = () => { if (list) { out.push(`<ul>${list.map((i) => `<li>${faqInline(i)}</li>`).join('')}</ul>`); list = null; } };
-    const flushQuote = () => { if (quote) { out.push(`<blockquote class="faq-quote"><p>${quote.map(faqInline).join('<br>')}</p></blockquote>`); quote = null; } };
+    const flushQuote = () => { if (quote) { out.push(`<blockquote class="faq-quote glass"><p>${quote.map(faqInline).join('<br>')}</p></blockquote>`); quote = null; } };
     for (const line of chunk.split('\n')) {
       const t = line.trim();
       if (!t) continue;
       let m;
       if ((m = t.match(/^>\s?(.*)$/))) { flushPara(); flushList(); (quote ||= []).push(m[1]); continue; }
       flushQuote();
+      // Рядок, що повністю складається з **жирного**, — підзаголовок розділу всередині відповіді
+      if ((m = t.match(/^\*\*([^*]+)\*\*$/))) { flushPara(); flushList(); out.push(`<h4 class="faq-sub">${faqInline(m[1])}</h4>`); continue; }
       if ((m = t.match(/^-\s+(.*)$/))) { flushPara(); (list ||= []).push(m[1]); } else { flushList(); para.push(t); }
     }
     flushPara();
@@ -604,6 +610,7 @@ export function faqAnswer(src) {
 const faqPlain = (src) => String(src || '').replace(/\r/g, '')
   .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1 ($2)') // [текст](адреса) → «текст (адреса)»
   .replace(/^>\s?/gm, '') // позначки цитат
+  .replace(/^-\s+/gm, '• ') // маркери списків
   .replace(/\*\*(.+?)\*\*/g, '$1').trim();
 
 /** Лінія-хвиля під питанням (промальовується при відкритті): 40 півхвиль на ширину блоку. */
@@ -613,20 +620,24 @@ const FAQ_ICON = raw('<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="tru
 // Градієнт лінії-хвилі (рожевий → ціановий) — один на сторінку, поруч зі списком питань
 const FAQ_DEFS = raw('<svg class="faq-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs><linearGradient id="faq-grad" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#FF2E9A"/><stop offset="1" stop-color="#00E5FF"/></linearGradient></defs></svg>');
 /** Одне питання — скляний рядок details/summary (сторінка FAQ і блок на головній). withId — id для посилань #id. */
-function faqItem(it, n, groupName, withId = true) {
+/** Куди веде кнопка «Переглянути послуги» у відповіді: питання про дистрибуцію — одразу до картки Дистрибуція. */
+const faqServicesHref = (it, groupId = '') => (groupId === 'distribution' || /^distribution/.test(it.id || '') ? '/services#distribution' : '/services');
+function faqItem(it, n, groupName, withId = true, groupId = it._group || '') {
   return html`
           <details class="faq-item glass glass-card" ${withId && it.id ? raw(`id="${esc(it.id)}"`) : ''} name="${groupName}" data-faq-item>
             <summary class="faq-q"><span class="faq-num" aria-hidden="true">${String(n).padStart(2, '0')}</span><span class="faq-q-text">${it.q}</span>${FAQ_ICON}</summary>
             <div class="faq-a">
               <svg class="faq-wave" viewBox="0 0 400 8" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="${FAQ_WAVE}"/></svg>
-              <div class="faq-a-body">${faqAnswer(it.a)}</div>
+              <div class="faq-a-body">${faqAnswer(it.a)}
+                <p class="faq-more"><a class="btn btn-glass btn-sm faq-svc" href="${faqServicesHref(it, groupId)}">Переглянути послуги${icon.arrow}</a></p>
+              </div>
             </div>
           </details>`;
 }
 /** Питання для головної: id зі списку home у faq.json, у тому самому порядку. */
 export function faqHomeItems(faq) {
   const all = new Map();
-  for (const g of (faq && Array.isArray(faq.groups) ? faq.groups : [])) for (const it of (g && Array.isArray(g.items) ? g.items : [])) if (it && it.id && it.q) all.set(it.id, it);
+  for (const g of (faq && Array.isArray(faq.groups) ? faq.groups : [])) for (const it of (g && Array.isArray(g.items) ? g.items : [])) if (it && it.id && it.q) all.set(it.id, { ...it, _group: g.id });
   return (faq && Array.isArray(faq.home) ? faq.home : []).map((id) => all.get(id)).filter(Boolean);
 }
 
@@ -672,7 +683,7 @@ export function faqPage(faq) {
         <div class="faq-list">
           ${g.items.map((it) => {
             n += 1;
-            return faqItem(it, n, `faq-${g.id}`);
+            return faqItem(it, n, `faq-${g.id}`, true, g.id);
           })}
         </div>
       </section>`)}
@@ -682,6 +693,7 @@ export function faqPage(faq) {
         <p class="muted">Напишіть нам у Telegram або одразу оберіть час для запису — підкажемо з будь-яким питанням.</p>
         <div class="hero-ctas">
           <a class="btn btn-glass" href="${tg}" rel="noopener" data-cta="faq_telegram">${c.telegram ? 'Написати в Telegram' : 'Контакти'}${icon.arrowUp}</a>
+          ${btn('/services', 'Усі послуги', 'glass', icon.arrow, 'data-cta="faq_services"')}
           ${btn('/book', 'Записатися', 'neon', icon.arrow, 'data-cta="faq_book"')}
         </div>
       </section>
