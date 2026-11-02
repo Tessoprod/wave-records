@@ -1,4 +1,5 @@
-/* Wave Records — динамічний фон: стрічки звукових хвиль, точки й зерно з паралаксом.
+/* Wave Records — динамічний фон: стрічки звукових хвиль, точки, зерно з паралаксом
+   і (лише з мишею) дрібні частинки, що тонко реагують на курсор.
    Шари (від дальнього до ближнього):
      .bg-dots   — сітка точок, при прокрутці зсувається найповільніше (CSS transform);
      canvas     — дві групи стрічок хвиль: дальні (повільні, тьмяні) і ближні;
@@ -118,11 +119,104 @@
     ctx.globalAlpha = 1;
   }
 
+  /* ---------- Частинки, що тонко реагують на курсор ----------
+     Кілька десятків точок 1–2 px (білі, рожеві, ціанові, низька непрозорість) повільно дрейфують;
+     у радіусі ~180 px від курсора м'яко відштовхуються й закручуються. За швидким рухом миші лишається
+     ледь помітний слід, що згасає за пів секунди. Лише для миші і без prefers-reduced-motion;
+     малюються в тому самому canvas і циклі, що й стрілки (на паузі разом із ним). */
+  const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const MOTE_COLORS = [[245, 245, 245], [245, 245, 245], [255, 46, 154], [0, 229, 255]];
+  const RADIUS = 180;
+  const TRAIL_LIFE = 0.5;
+  const motes = [];
+  const sparks = [];
+  const mouse = { x: 0, y: 0, vx: 0, vy: 0, t: 0, on: false };
+  if (fine && !reduceMotion) {
+    for (let i = 0; i < 46; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const sp = 4 + Math.random() * 8; // px/с — ледь помітний дрейф
+      motes.push({
+        x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+        dx: Math.cos(ang) * sp, dy: Math.sin(ang) * sp, vx: 0, vy: 0,
+        r: 0.6 + Math.random() * 0.4, c: MOTE_COLORS[i % MOTE_COLORS.length],
+        a: 0.24 + Math.random() * 0.2, ph: Math.random() * Math.PI * 2,
+      });
+    }
+    addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const now = performance.now();
+      if (mouse.on) {
+        const dt = Math.max(8, now - mouse.t) / 1000;
+        mouse.vx = (e.clientX - mouse.x) / dt;
+        mouse.vy = (e.clientY - mouse.y) / dt;
+        // Слід лише за швидким рухом: кілька частинок на подію, загалом не більше 36
+        const speed = Math.hypot(mouse.vx, mouse.vy);
+        if (speed > 900 && sparks.length < 36) {
+          for (let k = 0; k < 2; k++) {
+            sparks.push({
+              x: e.clientX + (Math.random() - 0.5) * 6, y: e.clientY + (Math.random() - 0.5) * 6,
+              vx: -mouse.vx * 0.03 + (Math.random() - 0.5) * 30, vy: -mouse.vy * 0.03 + (Math.random() - 0.5) * 30,
+              life: 0, r: 0.6 + Math.random() * 0.5, c: MOTE_COLORS[(Math.random() * 4) | 0],
+            });
+          }
+        }
+      }
+      mouse.x = e.clientX; mouse.y = e.clientY; mouse.t = now; mouse.on = true;
+    }, { passive: true });
+    document.documentElement.addEventListener('pointerleave', () => { mouse.on = false; }, { passive: true });
+  }
+
+  function updateParticles(dt, t) {
+    for (const m of motes) {
+      if (mouse.on) {
+        const ddx = m.x - mouse.x;
+        const ddy = m.y - mouse.y;
+        const d = Math.hypot(ddx, ddy);
+        if (d < RADIUS && d > 0.5) {
+          // Відштовхування від курсора плюс закручування навколо нього, слабшає до краю радіуса
+          const f = (1 - d / RADIUS) ** 2;
+          const nx = ddx / d;
+          const ny = ddy / d;
+          m.vx += (nx * 140 - ny * 90) * f * dt;
+          m.vy += (ny * 140 + nx * 90) * f * dt;
+        }
+      }
+      const damp = Math.pow(0.25, dt); // поштовх згасає приблизно за секунду
+      m.vx *= damp; m.vy *= damp;
+      m.x += (m.dx + m.vx) * dt;
+      m.y += (m.dy + m.vy) * dt;
+      // Хто вийшов за край — повертається з протилежного боку
+      if (m.x < -8) m.x = W + 8; else if (m.x > W + 8) m.x = -8;
+      if (m.y < -8) m.y = H + 8; else if (m.y > H + 8) m.y = -8;
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i];
+      sp.life += dt;
+      if (sp.life > TRAIL_LIFE) { sparks.splice(i, 1); continue; }
+      sp.x += sp.vx * dt; sp.y += sp.vy * dt;
+      sp.vx *= Math.pow(0.1, dt); sp.vy *= Math.pow(0.1, dt);
+    }
+  }
+
+  function drawParticles(t) {
+    if (!motes.length && !sparks.length) return;
+    for (const m of motes) {
+      const tw = 0.75 + 0.25 * Math.sin(t * 0.8 + m.ph); // ледь помітне мерехтіння
+      ctx.fillStyle = rgba(m.c, (m.a * tw).toFixed(3));
+      ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill();
+    }
+    for (const sp of sparks) {
+      ctx.fillStyle = rgba(sp.c, (0.42 * (1 - sp.life / TRAIL_LIFE)).toFixed(3));
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
   function draw(t, scroll) {
     ctx.clearRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineJoin = 'round';
     for (const r of ribbons) drawRibbon(r, t, scroll);
+    drawParticles(t);
     ctx.globalCompositeOperation = 'source-over';
     if (dots) dots.style.transform = `translate3d(0, ${(-(scroll * DOTS_PARALLAX) % DOT_STEP).toFixed(2)}px, 0)`;
   }
@@ -154,6 +248,7 @@
     level.bass += ((a ? a.bass : 0) - level.bass) * 0.12;
     level.mid += ((a ? a.mid : 0) - level.mid) * 0.12;
     scrollShown += (scrollY - scrollShown) * 0.18;
+    updateParticles(dt, time);
     draw(time, scrollShown);
   }
   const start = () => { if (!raf) { prev = performance.now(); raf = requestAnimationFrame(frame); } };

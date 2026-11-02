@@ -156,10 +156,15 @@ export function layout({ title, description, path: current = '/', body, bodyClas
     <nav class="menu-inner container" aria-label="Головне меню">
       <ol class="menu-links" role="list">${navLinks}</ol>
       <div class="menu-foot">
-        <p class="menu-contact">${c.city}, ${c.address}</p>
-        <p class="menu-contact"><a href="${telLink(c.phone)}">${c.phone}</a></p>
-        ${c.telegram ? html`<p class="menu-contact"><a href="https://t.me/${c.telegram}" rel="noopener">Telegram @${c.telegram}</a></p>` : ''}
-        <a class="btn btn-neon menu-book" href="/book">Записатися${icon.arrow}</a>
+        <div class="menu-corner">
+          <p class="menu-contact">${c.city}, ${c.address}</p>
+          <p class="menu-contact">${c.schedule_days}, ${c.schedule_hours}</p>
+        </div>
+        <div class="menu-corner menu-corner-r">
+          <p class="menu-contact"><a href="${telLink(c.phone)}">${c.phone}</a></p>
+          ${c.telegram ? html`<p class="menu-contact"><a href="https://t.me/${c.telegram}" rel="noopener">Telegram @${c.telegram}</a></p>` : ''}
+          <a class="btn btn-neon menu-book" href="/book">Записатися${icon.arrow}</a>
+        </div>
       </div>
     </nav>
   </div>

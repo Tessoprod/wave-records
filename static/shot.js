@@ -46,9 +46,11 @@ if (!browser) { console.error('Не знайдено Microsoft Edge або Googl
 // Один тимчасовий профіль браузера — у _shots/.profile (не в %TEMP%, де профілі накопичуються); після зйомки видаляється
 const profile = path.join(OUT, '.profile');
 fs.rmSync(profile, { recursive: true, force: true });
-fs.mkdirSync(profile, { recursive: true });
+fs.mkdirSync(path.join(profile, 'tmp'), { recursive: true });
 const proc = spawn(browser, ['--headless=new', '--hide-scrollbars', '--disable-gpu', '--no-first-run',
-  `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
+  `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'],
+  // TEMP теж усередині профілю: службові папки браузера (scoped_dir…) не лишаються в %TEMP% і видаляються разом із ним
+  { stdio: 'ignore', env: { ...process.env, TEMP: path.join(profile, 'tmp'), TMP: path.join(profile, 'tmp') } });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

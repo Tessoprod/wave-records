@@ -346,7 +346,7 @@ html.eq-on :is(.site-header, .site-footer) .logo-bars { opacity: 1; }
 
 /* ---------- Меню ----------
    Шари (знизу вгору): .menu-blur — сайт позаду розмитий і затемнений; .menu-wave — темна хвиля,
-   що накриває екран згори донизу (path морфить motion.js); .menu-inner — пункти й контакти.
+   що накриває екран згори донизу (path морфить motion.js); .menu-inner — пункти й контакти (сітка нижче).
    Без GSAP або з prefers-reduced-motion меню просто проявляється (.is-open). */
 
 .menu { position: fixed; inset: 0; z-index: 40; overflow-y: auto; overscroll-behavior: contain; }
@@ -366,40 +366,82 @@ html.eq-on :is(.site-header, .site-footer) .logo-bars { opacity: 1; }
 .menu:not(.is-animated):not(.is-open) .menu-wave { opacity: 0; }
 .menu:not(.is-animated).is-open .menu-blur { opacity: 1; }
 
+/* Компонування: сітка на весь екран, дзеркальна відносно центру.
+   Кути — службові елементи: угорі логотип і «Закрити» (це шапка сайту, у відкритому меню без скляної підкладки),
+   унизу ліворуч — адреса й графік, унизу праворуч — телефон, Telegram і «Записатися».
+   Пункти — дві колонки по три рядки: ліва вирівняна ліворуч, права — праворуч; рядки рівномірно по висоті.
+   Тонка вертикальна лінія по центру підкреслює симетрію. */
 .menu-inner {
   position: relative; min-height: 100%;
-  display: flex; flex-direction: column; justify-content: space-between; gap: 40px;
-  padding: calc(var(--header-h) + clamp(32px, 6vh, 64px)) 0 calc(32px + env(safe-area-inset-bottom, 0px));
+  display: grid; grid-template-rows: 1fr auto; gap: clamp(20px, 3vh, 36px);
+  padding: calc(var(--header-h) + clamp(12px, 3vh, 32px)) 0 calc(clamp(20px, 3.5vh, 36px) + env(safe-area-inset-bottom, 0px));
 }
-.menu-links { list-style: none; display: flex; flex-direction: column; gap: clamp(2px, .8vh, 10px); }
+.menu-links {
+  position: relative; list-style: none;
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 1fr); grid-auto-flow: column;
+  align-items: center; column-gap: clamp(32px, 6vw, 120px);
+}
+.menu-links::before {
+  content: ''; position: absolute; left: 50%; top: 4%; bottom: 4%; width: 1px; transform: translateX(-50%);
+  background: linear-gradient(transparent, rgba(245, 245, 245, .16) 20%, rgba(245, 245, 245, .16) 80%, transparent);
+}
+.menu-links li:nth-child(-n + 3) { justify-self: start; }
+.menu-links li:nth-child(n + 4) { justify-self: end; text-align: right; }
 .menu-links a {
-  position: relative; display: inline-flex; align-items: baseline; gap: 14px;
-  min-height: 44px; padding: 4px 0 10px;
-  font-size: clamp(30px, 4.2vw, 56px); line-height: 1.05;
+  --shift: 10px;
+  position: relative; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  min-height: 44px; padding: 4px 0 14px;
+  font-size: clamp(36px, 5vw, 88px); line-height: 1;
   text-decoration: none;
-  transition: transform .35s var(--ease), color .25s;
+  transition: transform .35s var(--ease), color .25s, opacity .3s var(--ease);
 }
-.menu-num { font: 600 12px/1 var(--font-text); letter-spacing: .14em; color: var(--pink); transform: translateY(-1.2em); }
+.menu-links li:nth-child(n + 4) a { align-items: flex-end; --shift: -10px; }
+/* Дрібний неоновий номер над пунктом */
+.menu-num { font: 600 12px/1 var(--font-text); letter-spacing: .16em; color: var(--pink); }
+.menu-text { display: inline-flex; align-items: center; gap: .3em; }
 /* Лінія-хвиля під пунктом: промальовується зліва направо при наведенні чи фокусі */
-.menu-line { position: absolute; left: calc(14px + 2ch); right: 0; bottom: 0; width: auto; height: 8px; overflow: visible; }
-.menu-line path { fill: none; stroke: url(#menu-edge); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .55s var(--ease); }
-.menu-links a:hover .menu-line path, .menu-links a:focus-visible .menu-line path { stroke-dashoffset: 0; }
-.menu-links a:hover, .menu-links a:focus-visible { transform: translateX(10px); }
-/* Активна сторінка — неонова точка */
-.menu-links a[aria-current="page"]::after { content: ''; align-self: center; width: 10px; height: 10px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 18px rgba(var(--pink-rgb), .35); }
-.menu-foot {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px;
-  border-top: 1px solid var(--line); padding-top: 22px;
-  color: var(--ink-2); font-size: 16px;
+.menu-line { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 8px; overflow: visible; clip-path: inset(-4px 100% -4px 0); transition: clip-path .55s var(--ease); }
+.menu-line path { fill: none; stroke: url(#menu-edge); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.menu-links a:hover .menu-line, .menu-links a:focus-visible .menu-line { clip-path: inset(-4px 0 -4px 0); }
+/* Легкий зсув до центру, решта пунктів притухає */
+.menu-links a:hover, .menu-links a:focus-visible { transform: translateX(var(--shift)); }
+@media (hover: hover) and (pointer: fine) {
+  .menu-links:has(a:hover) a:not(:hover) { opacity: .4; }
 }
+.menu-links:has(a:focus-visible) a:not(:focus-visible) { opacity: .4; }
+/* Активна сторінка — неонова точка після назви */
+.menu-links a[aria-current="page"] .menu-text::after { content: ''; width: .14em; height: .14em; min-width: 8px; min-height: 8px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 18px rgba(var(--pink-rgb), .35); }
+
+/* Нижні кути */
+.menu-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 32px; color: var(--ink-2); font-size: 16px; }
+.menu-corner { display: flex; flex-direction: column; gap: 2px; }
+.menu-corner-r { align-items: flex-end; text-align: right; }
+.menu-contact { margin: 0; }
 .menu-contact a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; transition: color .25s; }
 .menu-contact a:hover { color: var(--white); }
-.menu-book { margin-left: auto; }
-body.menu-open { overflow: hidden; }
-@media (max-width: 640px) {
-  .menu-foot { flex-direction: column; align-items: flex-start; gap: 2px; }
-  .menu-book { margin: 12px 0 0; width: 100%; }
+.menu-book { margin-top: 10px; }
+
+/* Поки меню відкрите, шапка — лише логотип і «Закрити» в кутах, без скляної підкладки */
+body.menu-open .site-header.glass { background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+body.menu-open .site-header.glass::before, body.menu-open .site-header.glass::after { opacity: 0; }
+body.menu-open .header-book { opacity: 0; visibility: hidden; transition: opacity .2s, visibility 0s .2s; }
+
+/* Планшет: та сама сітка, пункти менші */
+@media (max-width: 1100px) {
+  .menu-links a { font-size: clamp(32px, 5.4vw, 56px); }
 }
+/* Телефон: одна колонка по центру, рівномірно на всю висоту; службові елементи компактно знизу */
+@media (max-width: 640px) {
+  .menu-links { grid-template-columns: 1fr; grid-template-rows: repeat(6, 1fr); grid-auto-flow: row; }
+  .menu-links::before { display: none; }
+  .menu-links li:nth-child(n) { justify-self: center; text-align: center; }
+  .menu-links li:nth-child(n) a { align-items: center; --shift: 0px; font-size: clamp(30px, 9vw, 44px); gap: 6px; padding-bottom: 10px; }
+  .menu-foot { flex-direction: column; align-items: stretch; gap: 4px; font-size: 15px; }
+  .menu-corner, .menu-corner-r { align-items: center; text-align: center; }
+  .menu-corner-r { flex-direction: row; flex-wrap: wrap; justify-content: center; column-gap: 20px; }
+  .menu-book { width: 100%; margin-top: 8px; }
+}
+body.menu-open { overflow: hidden; }
 
 /* ---------- Секції ---------- */
 
@@ -492,9 +534,10 @@ html.stage-on .home-stage > * { grid-area: 1 / 1; }
 html.stage-on .home-stage > #after-hero { display: none; }
 html.stage-on .svc-section { position: relative; z-index: 2; align-self: center; padding: var(--header-h) 0 clamp(24px, 4vh, 48px); }
 html.stage-on .svc-section:not(.is-placed) { pointer-events: none; }
-html.stage-on [data-hero-intro].is-in { opacity: calc(1 - var(--stage-out, 0)); transform: translateY(calc(var(--stage-out, 0) * -30%)); }
-/* Текст згас — перший екран повністю прихований і не перехоплює кліки (клас ставить motion.js) */
-html.stage-on .hero.is-covered :is([data-hero-intro], .scroll-hint) { visibility: hidden; pointer-events: none; opacity: 0; }
+/* Поки картки не на місцях, порожній контейнер тексту першого екрана не перехоплює кліки (самі заголовок і кнопки
+   ховає motion.js через autoAlpha, лише коли вони повністю згасли) */
+html.stage-on .hero-inner { pointer-events: none; }
+html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 
 .svc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .svc-grid li:nth-child(1), .svc-grid li:nth-child(6) { grid-column: span 2; }
@@ -1060,7 +1103,6 @@ html.vt-in main h1, html.vt-in [data-hero-intro] { opacity: 1 !important; animat
   /* Назва треку — до двох рядків замість обрізання */
   .track-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .track-wave { height: 40px; }
-  .menu-links a { font-size: clamp(28px, 8.4vw, 40px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

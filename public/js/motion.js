@@ -108,6 +108,33 @@ function headings() {
   });
 }
 
+/* ---------- Плавне зникнення першого екрана ----------
+   Прив'язане до прогресу прокрутки (scrub, синхронно з Lenis), без перемикання класів:
+   заголовок піднімається на ~70 px, згасає і ледь розмивається; підзаголовок із кнопками — з невеликою затримкою.
+   autoAlpha вмикає visibility: hidden лише при непрозорості рівно 0 і знімає, щойно вона починає зростати,
+   тож нагорі кнопки завжди клікабельні. prefers-reduced-motion — лише згасання, без руху й розмиття.
+   Анімуються тільки transform, opacity і filter. */
+function heroFadeTweens(tl, at = 0) {
+  const hero = document.querySelector('.hero');
+  if (!hero) return;
+  const out = (el, offset, span, dy) => {
+    if (!el) return;
+    tl.fromTo(el,
+      { autoAlpha: 1, y: 0, filter: 'blur(0px)' },
+      { autoAlpha: 0, y: reduceMotion ? 0 : dy, filter: reduceMotion ? 'blur(0px)' : 'blur(7px)', duration: span, ease: 'none' },
+      at + offset);
+  };
+  out(hero.querySelector('.hero-title'), 0, 0.62, -70);
+  out(hero.querySelector('.hero-bottom'), 0.1, 0.6, -48);
+}
+// Без закріплення (телефон, планшет, prefers-reduced-motion): той самий ефект, поки перший екран іде вгору
+function heroFadeStandalone() {
+  const hero = document.querySelector('.hero');
+  if (!hero) return;
+  const tl = gsap.timeline({ scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: reduceMotion ? true : 0.8 } });
+  heroFadeTweens(tl, 0);
+}
+
 /* ---------- Поява Послуг на головній ----------
    Перший екран закріплюється (pin + scrub, синхронно з Lenis). Під час прокрутки текст іде вгору й згасає,
    3D-сцена віддаляється, а з центру екрана виїжджають картки послуг: спершу купкою, зменшені, напівпрозорі
@@ -123,7 +150,6 @@ function servicesStage() {
   if (svc.offsetHeight > innerHeight) { root.classList.remove('stage-on'); return false; }
   const items = $$('.svc-grid > li', svc);
   const head = $$('.sec-head > *', svc);
-  const inner = hero.querySelector('[data-hero-intro]');
   const hint = hero.querySelector('[data-scroll-hint]');
   // Зсув картки від її місця до центру екрана (без урахування transform — рахуємо через offset*)
   const pos = (el) => {
@@ -147,9 +173,6 @@ function servicesStage() {
       onUpdate: (st) => {
         const p = st.progress;
         motion.hero?.setScroll(Math.min(1, p * 1.4));
-        // Перший екран (текст, кнопки, «Scroll») — повністю прихований і не перехоплює кліки, щойно текст згас;
-        // при прокрутці назад повертається і знову клікабельний
-        hero.classList.toggle('is-covered', p > 0.34);
         // Картки клікабельні, щойно доїхали на місця (а не лише наприкінці закріплення)
         svc.classList.toggle('is-placed', p > 0.62);
         // 3D-сцена наприкінці згасає (autoAlpha у таймлайні) — тоді не рендеримо її
@@ -158,9 +181,9 @@ function servicesStage() {
       },
     },
   });
-  // Текст першого екрана йде вгору й згасає через змінну --stage-out (стилі .hero-inner у site.css):
-  // так сцена не перебиває появу тексту й завжди стартує з нуля. «Scroll» ховається сам із початком прокрутки.
-  tl.fromTo(hero, { '--stage-out': 0 }, { '--stage-out': 1, duration: 0.35, ease: 'power2.in' }, 0);
+  // Заголовок і кнопки першого екрана плавно йдуть угору й згасають у першій половині появи карток
+  // (картки збираються з 0.18 і розходяться з 0.32 — рух безперервний). «Scroll» ховається сам із початком прокрутки.
+  heroFadeTweens(tl, 0);
   // Картки з'являються купкою в центрі…
   tl.fromTo(items, { x: toCenterX, y: toCenterY, scale: 0.5, rotate: (i) => (i % 2 ? 1 : -1) * (3 + i), opacity: 0, filter: 'blur(10px)' },
     { scale: 0.6, opacity: 0.45, filter: 'blur(6px)', duration: 0.12, ease: 'power1.out', stagger: 0.015 }, 0.18)
@@ -428,7 +451,10 @@ function menuWave() {
     tl?.kill();
     tl = gsap.timeline();
     if (open) {
-      gsap.set(links, { opacity: 0, y: 28 });
+      // Пункти в'їжджають від країв екрана до центру: ліва колонка — зліва, права — справа
+      // (на телефоні, в одну колонку, — знизу)
+      const oneCol = matchMedia('(max-width: 640px)').matches;
+      links.forEach((li, i) => gsap.set(li, oneCol ? { opacity: 0, x: 0, y: 24 } : { opacity: 0, y: 0, x: i < 3 ? -70 : 70 }));
       gsap.set(foot, { opacity: 0, y: 14 });
       gsap.set(edge, { opacity: 0.85 });
       Object.assign(w, { y: -14, a: 0, ph: 0 });
@@ -438,11 +464,11 @@ function menuWave() {
         .to(w, { a: 0, duration: 0.45, ease: 'sine.in' }, 0.4)
         .to(edge, { opacity: 0, duration: 0.2 }, 0.68)
         .call(resolve, null, 0.6)
-        .to(links, { opacity: 1, y: 0, duration: 0.75, ease: EASE, stagger: 0.06 }, 0.5)
+        .to(links, { opacity: 1, x: 0, y: 0, duration: 0.8, ease: EASE, stagger: (i) => (i % 3) * 0.08 + (i < 3 ? 0 : 0.04) }, 0.5)
         .to(foot, { opacity: 1, y: 0, duration: 0.6, ease: SOFT }, 0.8);
     } else {
       gsap.set(edge, { opacity: 0.85 });
-      tl.to([links, foot], { opacity: 0, y: -12, duration: 0.25, ease: 'power2.in', stagger: 0.02 }, 0)
+      tl.to([links, foot], { opacity: 0, duration: 0.25, ease: 'power2.in', stagger: 0.02 }, 0)
         .to(w, { y: -14, ph: 0, duration: 0.7, ease: 'power3.inOut', onUpdate: draw }, 0.12)
         .to(w, { a: 8, duration: 0.32, ease: 'sine.out' }, 0.12)
         .to(w, { a: 0, duration: 0.38, ease: 'sine.in' }, 0.44)
@@ -712,6 +738,7 @@ try {
   heroIntro();
   scrollHint();
   motion.stage = servicesStage();
+  if (!motion.stage) heroFadeStandalone();
   steps();
   blocks();
   about();
