@@ -96,8 +96,10 @@ export function layout({ title, description, path: current = '/', body, bodyClas
        js — є JavaScript; wr-anim — приховані стани анімацій (не з prefers-reduced-motion);
        wr-intro — інтро при першому вході в сесії; from-menu — прийшли з меню (позначка wr_from_menu у sessionStorage):
        шторка опущена з першого кадру. Порядок появи веде диригент у motion.js.
-       Запобіжники: якщо motion.js не запустився за 4 с — усе видно; після інтро чи шторки motion.js
-       викликає wrArmFailsafe(): якщо за 3 с поява не почалась — усе видно без анімації. -->
+       Запобіжники: motion.js (модуль) виконується до DOMContentLoaded — якщо на той момент він не запустився
+       (помилка чи не завантажився), усе видно одразу; крайній строк — 10 с. Після інтро чи шторки motion.js
+       викликає wrArmFailsafe(): якщо за 3 с поява не почалась — усе видно без анімації. Показану так сторінку
+       motion.js уже не анімує (клас wr-failsafe) — текст не мигає. -->
   <script>(function(d,w){var s=null;try{s=w.sessionStorage}catch(e){}
 function get(k){try{return s&&s.getItem(k)}catch(e){return null}}function del(k){try{s&&s.removeItem(k)}catch(e){}}
 var still=matchMedia('(prefers-reduced-motion: reduce)').matches,fm=+get('wr_from_menu');d.classList.add('js');
@@ -107,7 +109,7 @@ function quiet(v){function n(){}v.ready.catch(n);v.finished.catch(n);if(v.update
 w.wrRevealed=new Promise(function(r){if(!('onpagereveal' in w))return r();w.addEventListener('pagereveal',function(e){var v=e.viewTransition&&quiet(e.viewTransition);if(v){if(d.classList.contains('from-menu'))v.skipTransition();else{d.classList.add('vt-in');w.wrViewTransition=v}}r()},{once:true});setTimeout(r,1500)});
 w.addEventListener('pageswap',function(e){var v=e.viewTransition&&quiet(e.viewTransition);if(v&&get('wr_from_menu'))v.skipTransition()});
 function reveal(){d.classList.remove('wr-anim','wr-intro','from-menu');d.classList.add('wr-failsafe');del('wr_from_menu')}
-setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.ready))reveal()},4000);
+function check(){if(!(w.wrMotion&&w.wrMotion.ready))reveal()}document.addEventListener('DOMContentLoaded',function(){setTimeout(check,0)});setTimeout(check,10000);
 w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.contentStarted))reveal()},3000)}})(document.documentElement,window)</script>
   <title>${fullTitle}</title>
   <meta name="description" content="${desc}">

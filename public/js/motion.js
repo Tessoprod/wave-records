@@ -26,6 +26,9 @@ const motion = window.wrMotion = {
 // pagereveal (з <head>) каже, чи прийшли через View Transition; motion.js може запуститися раніше за нього
 const revealed = window.wrRevealed || Promise.resolve();
 const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
+// Шрифти для появи назви: чекаємо не довше 2,5 с від старту сторінки (відлік іде паралельно з інтро чи шторкою,
+// тож після них назва з'являється без паузи; і завжди раніше за запобіжник у 3 с — інакше текст мигне)
+const fontsForTitle = Promise.race([fontsReady, new Promise((r) => setTimeout(r, 2500))]);
 
 /* ---------- Плавний скрол ---------- */
 function smoothScroll() {
@@ -569,7 +572,6 @@ function faqAnim() {
 function intro() {
   const el = document.querySelector('[data-intro]');
   if (!el || !root.classList.contains('wr-intro')) { el?.remove(); return Promise.resolve(); }
-  el.style.animation = 'none'; // CSS-запобіжник більше не потрібен
   motion.lenis?.stop();
   const logoImg = el.querySelector('.logo-img');
   const logoBars = el.querySelector('.logo-bars');
@@ -670,13 +672,13 @@ function intro() {
 /* Поява першого екрана (його «назва сторінки»): викликає диригент після інтро чи шторки.
    Текст і 3D-сцена проявляються разом, один раз; якщо сцена ще не готова — проявиться, щойно буде.
    Літери WAVE RECORDS виїжджають знизу, далі решта. */
-function heroIntro() {
+function heroIntro(still = false) {
   const intro = document.querySelector('[data-hero-intro]');
   const host = document.querySelector('[data-hero-scene]');
   const revealScene = () => host?.classList.add('is-ready');
   if (!intro) { motion.heroReady?.then(revealScene); return; }
   const show = () => { intro.classList.add('is-in'); motion.heroReady?.then(revealScene); };
-  if (!gsap || reduceMotion) { show(); return; }
+  if (!gsap || reduceMotion || still) { show(); return; }
   const line1 = intro.querySelector('.hero-l1');
   const rest = intro.querySelectorAll('.hero-l2, .hero-sub, .hero-ctas');
   {
@@ -804,7 +806,8 @@ function homeLinks() {
      2) вхід — інтро (перше відвідування) | шторка з меню (from-menu) | View Transition (звичайне посилання) | нічого;
      3) лише після повного завершення входу — назва сторінки (перший екран на головній);
      4) за мить — решта контенту.
-   Запобіжник із <head> (wrArmFailsafe) починає відлік лише після входу: якщо поява не почалась за 3 с — усе видно. */
+   Запобіжник із <head> (wrArmFailsafe) починає відлік лише після входу: якщо поява не почалась за 3 с — усе видно.
+   Якщо сторінку вже показав запобіжник (html.wr-failsafe), поява не запускається — текст не ховається повторно. */
 async function entrance() {
   await revealed;
   if (root.classList.contains('wr-intro')) return motion.introDone;
@@ -815,8 +818,10 @@ async function entrance() {
 }
 async function conductor() {
   await motion.entered;
+  if (failed()) { staticPage(); return; }
   window.wrArmFailsafe?.();
-  await fontsReady; // рядки ділимо лише за справжніми шрифтами
+  await fontsForTitle; // рядки ділимо за справжніми шрифтами (див. fontsForTitle)
+  if (failed()) { staticPage(); return; }
   motion.contentStarted = true;
   heroIntro();
   pageTitle();
@@ -831,6 +836,13 @@ async function conductor() {
   ScrollTrigger.refresh();
 }
 
+// Запобіжник із <head> уже показав сторінку без анімації (клас wr-failsafe) — нічого не ховаємо повторно
+const failed = () => root.classList.contains('wr-failsafe');
+function staticPage() {
+  motion.contentStarted = true;
+  showAll();
+  heroIntro(true);
+}
 function showAll() {
   root.classList.remove('wr-anim', 'wr-intro', 'from-menu');
   try { sessionStorage.removeItem('wr_from_menu'); } catch { /* приватний режим */ }
@@ -860,7 +872,10 @@ try {
   faqAnim();
   logoEq();
   motion.ready = true;
-  if (reduceMotion) {
+  if (failed()) {
+    // motion.js запустився надто пізно, сторінку вже показано — лишаємо як є, без появ
+    staticPage();
+  } else if (reduceMotion) {
     // Без руху: усе видно одразу, жодних появ
     motion.contentStarted = true;
     heroIntro();

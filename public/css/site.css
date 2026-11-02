@@ -976,7 +976,8 @@ button:not(:disabled), [role="button"], summary, label[for], select { cursor: po
 
 /* ---------- Інтро при першому вході (анімацію веде motion.js) ----------
    Видно лише з html.wr-intro: клас ставить скрипт у <head> раз на сесію і не ставить при prefers-reduced-motion.
-   Без JS інтро немає. Якщо motion.js не підхопив інтро, воно саме зникає через 3,2 с. */
+   Без JS інтро немає. CSS-таймерів немає: якщо motion.js не запустився, скрипт у <head> знімає wr-intro
+   (після DOMContentLoaded), тож інтро не зникає й не з'являється знову при повільному завантаженні. */
 /* Шторка переходу з меню: на новій сторінці з першого кадру опущена на весь екран (html.from-menu),
    motion.js піднімає її тією самою хвилею, що й при закритті меню, і знімає клас. */
 .page-curtain { display: none; }
@@ -988,9 +989,7 @@ html.from-menu .page-curtain { display: block; position: fixed; inset: 0; z-inde
 .intro { display: none; }
 html.wr-intro .intro {
   display: block; position: fixed; inset: 0; z-index: 200; cursor: pointer;
-  animation: intro-failsafe .4s 3.2s forwards;
 }
-@keyframes intro-failsafe { to { opacity: 0; visibility: hidden; } }
 .intro-half { position: absolute; left: 0; right: 0; height: 50.5%; background: var(--black); will-change: transform; }
 .intro-top { top: 0; }
 .intro-bottom { bottom: 0; }
