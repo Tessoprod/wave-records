@@ -176,18 +176,22 @@ export function homePage({ homeServices, tracks, faq = null }) {
 
 /* ---------- /services ---------- */
 
-export function servicesPage({ sound, media }) {
+export function servicesPage({ sound, media, business = [] }) {
   const c = block('services');
   const tg = telegramUrl();
   const card = (s) => {
-    const cta = s.bookable
-      ? html`<a class="btn btn-neon btn-sm" href="${bookHref(s)}">Записатися${icon.arrow}</a>`
-      : html`<a class="btn btn-glass btn-sm" href="${tg}" rel="noopener">${s.category === 'media' ? c.media_cta : 'Обговорити'}${icon.arrowUp}</a>`;
+    const tgBtn = (label) => html`<a class="btn btn-glass btn-sm" href="${tg}" rel="noopener">${label}${icon.arrowUp}</a>`;
+    let cta;
+    if (s.category === 'business') {
+      // Бізнес: Telegram — як у Media | PR, і другорядна кнопка до питання «Як відбувається робота з бізнесом?» у FAQ
+      cta = html`${tgBtn(c.media_cta)}<a class="btn btn-glass btn-sm svc-how" href="/faq#business">Як це працює${icon.arrow}</a>`;
+    } else if (s.bookable) cta = html`<a class="btn btn-neon btn-sm" href="${bookHref(s)}">Записатися${icon.arrow}</a>`;
+    else cta = tgBtn(s.category === 'media' ? c.media_cta : 'Обговорити');
     return html`
     <li class="svc-full glass glass-card" ${s.anchor ? raw(`id="${esc(s.anchor)}"`) : ''}>
       <div class="svc-full-top">
         <h3 class="svc-name">${s.name}</h3>
-        <p class="svc-price">${s.price_label}</p>
+        <p class="svc-price${/\d/.test(s.price_label) ? '' : ' svc-price-text'}">${s.price_label}</p>
       </div>
       ${s.description ? html`<p class="svc-desc">${s.description}</p>` : ''}
       <div class="svc-full-cta">${cta}</div>
@@ -198,17 +202,24 @@ export function servicesPage({ sound, media }) {
     <h1 class="h1">${c.title}</h1>
     ${c.text ? html`<p class="page-lead">${c.text}</p>` : ''}
   </section>
-  <section class="section section-tight">
+  <section class="section section-tight" id="sound">
     <div class="container">
       <h2 class="h2 h-latin">${c.sound_title}</h2>
       <ul class="svc-full-grid" role="list">${sound.map(card)}</ul>
     </div>
   </section>
   ${media.length ? html`
-  <section class="section">
+  <section class="section" id="media">
     <div class="container">
       <h2 class="h2 h-latin">${c.media_title}</h2>
       <ul class="svc-full-grid" role="list">${media.map(card)}</ul>
+    </div>
+  </section>` : ''}
+  ${business.length ? html`
+  <section class="section" id="business">
+    <div class="container">
+      <h2 class="h2 h-latin">${c.business_title || 'BUSINESS'}</h2>
+      <ul class="svc-full-grid" role="list">${business.map(card)}</ul>
     </div>
   </section>` : ''}`;
   return layout({ title: c.title, path: '/services', description: 'Ціни на запис, зведення, мастеринг, біти, пісні під ключ та послуги для релізу у Wave Records.', body });
@@ -622,8 +633,13 @@ const FAQ_ICON = raw('<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="tru
 // Градієнт лінії-хвилі (рожевий → ціановий) — один на сторінку, поруч зі списком питань
 const FAQ_DEFS = raw('<svg class="faq-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs><linearGradient id="faq-grad" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#FF2E9A"/><stop offset="1" stop-color="#00E5FF"/></linearGradient></defs></svg>');
 /** Одне питання — скляний рядок details/summary (сторінка FAQ і блок на головній). withId — id для посилань #id. */
-/** Куди веде кнопка «Переглянути послуги» у відповіді: питання про дистрибуцію — одразу до картки Дистрибуція. */
-const faqServicesHref = (it, groupId = '') => (groupId === 'distribution' || /^distribution/.test(it.id || '') ? '/services#distribution' : '/services');
+/** Куди веде кнопка «Переглянути послуги» у відповіді: дистрибуція — до картки Дистрибуція, бізнес — до блоку BUSINESS. */
+const faqServicesHref = (it, groupId = '') => {
+  const key = `${it.id || ''} ${groupId}`;
+  if (/(^|\s)distribution/.test(key)) return '/services#distribution';
+  if (/(^|\s)business/.test(key)) return '/services#business';
+  return '/services';
+};
 function faqItem(it, n, groupName, withId = true, groupId = it._group || '') {
   return html`
           <details class="faq-item glass glass-card" ${withId && it.id ? raw(`id="${esc(it.id)}"`) : ''} name="${groupName}" data-faq-item>

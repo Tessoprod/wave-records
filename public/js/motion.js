@@ -26,12 +26,18 @@ const motion = window.wrMotion = {
 // pagereveal (з <head>) каже, чи прийшли через View Transition; motion.js може запуститися раніше за нього
 const revealed = window.wrRevealed || Promise.resolve();
 const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
-// Шрифти для появи назви: назву ділимо на рядки й показуємо лише зі справжнім шрифтом заголовків (Archivo Black).
+// Шрифти для появи назви: назву ділимо на рядки й показуємо лише зі справжніми шрифтами заголовків (Inter Tight 900 для
+// кирилиці й Archivo Black для латиниці; раніше чекали лише Archivo Black, у якому кирилиці немає, — тобто ні на що).
 // З запасним шрифтом інакше переносяться рядки (ширина .about-title — у ch, що залежить від шрифту) і змінюється
 // розмір — заголовок «стрибав» би після завантаження. Відлік іде від старту сторінки, паралельно з інтро чи шторкою;
 // крайній строк 6 с (якщо шрифт так і не завантажився — показуємо запасним).
 const fontsForTitle = Promise.race([
-  Promise.all([fontsReady, document.fonts?.load('400 1em "Archivo Black"', 'ВІД').catch(() => {})]),
+  Promise.all([
+    fontsReady,
+    // Кирилицю заголовків малює Inter Tight 900 (в Archivo Black кирилиці немає), латиницю — Archivo Black
+    document.fonts?.load('900 1em "Inter Tight"', 'ВІДЄЇҐ').catch(() => {}),
+    document.fonts?.load('400 1em "Archivo Black"', 'WAVE').catch(() => {}),
+  ]),
   new Promise((r) => setTimeout(r, 6000)),
 ]);
 

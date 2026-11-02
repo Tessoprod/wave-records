@@ -142,7 +142,11 @@
       return;
     }
     if (internal && !reduceMotion && window.wrMotion?.menuAnim) {
-      try { sessionStorage.setItem('wr_from_menu', String(Date.now())); } catch { setMenu(false); }
+      try { sessionStorage.setItem('wr_from_menu', String(Date.now())); } catch { setMenu(false); return; }
+      // Поверх опущеної шторки одразу — лоадер-хвиля з інтро; пункти меню згасають. Нова сторінка показує ту саму
+      // хвилю з першого кадру (фаза від годинника), тож анімація виглядає безперервною
+      document.documentElement.classList.add('nav-leaving');
+      window.wrNavLoader?.start();
       return; // шторку не піднімаємо — браузер переходить на нову сторінку
     }
     setMenu(false);
@@ -151,6 +155,7 @@
   // меню там ще відкрите — піднімаємо шторку, як при закритті
   addEventListener('pageshow', (e) => {
     try { sessionStorage.removeItem('wr_from_menu'); } catch { /* приватний режим */ }
+    if (e.persisted) { document.documentElement.classList.remove('nav-leaving'); window.wrNavLoader?.stop(); }
     if (e.persisted && isOpen()) setMenu(false);
   });
   document.addEventListener('keydown', (e) => {

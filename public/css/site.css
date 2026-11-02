@@ -2,6 +2,24 @@
    Wave Records — стилі публічного сайту
    ========================================================= */
 
+/* ---------- Шрифти (на самому сайті, public/fonts; опис і ліцензії — public/fonts/README.txt) ----------
+   Archivo Black має лише латиницю, тож кирилицю в заголовках малює Inter Tight 900. Шрифти заголовків — font-display: block
+   (поки вантажаться, текст невидимий, а не запасним шрифтом — інакше після підміни інакше переносяться рядки);
+   основний текст — swap. unicode-range: браузер вантажить лише потрібні набори (кирилиця / латиниця). */
+@font-face { font-family: 'Archivo Black'; font-style: normal; font-weight: 400; font-display: block; src: url('../fonts/archivo-black-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Inter Tight'; font-style: normal; font-weight: 800; font-display: block; src: url('../fonts/inter-tight-cyrillic-800-normal.woff2') format('woff2'); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family: 'Inter Tight'; font-style: normal; font-weight: 800; font-display: block; src: url('../fonts/inter-tight-latin-800-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Inter Tight'; font-style: normal; font-weight: 900; font-display: block; src: url('../fonts/inter-tight-cyrillic-900-normal.woff2') format('woff2'); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family: 'Inter Tight'; font-style: normal; font-weight: 900; font-display: block; src: url('../fonts/inter-tight-latin-900-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('../fonts/inter-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('../fonts/inter-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 500; font-display: swap; src: url('../fonts/inter-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 500; font-display: swap; src: url('../fonts/inter-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('../fonts/inter-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('../fonts/inter-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap; src: url('../fonts/inter-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap; src: url('../fonts/inter-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+
 :root {
   --black: #111111;          /* Night Black */
   --white: #F5F5F5;          /* Off White */
@@ -442,11 +460,12 @@ html.eq-on :is(.site-header, .site-footer) .logo-bars { opacity: 1; }
   width: .14em; height: .14em; min-width: 8px; min-height: 8px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 18px rgba(var(--pink-rgb), .35);
 }
 
-/* Низ меню — одна лінія на всю ширину: адреса — телефон — Telegram — «Записатися».
-   Крайні елементи по краях, проміжки однакові (space-between), спільна базова лінія.
-   Симетрія відносно центральної лінії: суми ширин пар «адреса + телефон» і «Telegram + кнопка» майже рівні
-   (адреса без міста — місто є у футері й на сторінці контактів). */
-.menu-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; color: var(--ink-2); font-size: 16px; }
+/* Низ меню — одна лінія: адреса — телефон — Telegram — «Записатися», спільна базова лінія.
+   Дві рівні половини з тим самим проміжком, що й між колонками пунктів (.menu-links): у кожній половині крайній елемент
+   біля краю, внутрішній — біля центральної лінії; телефон і Telegram на однаковій відстані від центру — ряд симетричний
+   за будь-якої довжини адреси. */
+.menu-foot { display: grid; grid-template-columns: 1fr 1fr; column-gap: clamp(32px, 6vw, 120px); align-items: baseline; color: var(--ink-2); font-size: 16px; }
+.menu-foot-half { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; min-width: 0; }
 .menu-contact { margin: 0; white-space: nowrap; }
 .menu-contact a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; transition: color .25s; }
 .menu-contact a:hover { color: var(--white); }
@@ -462,10 +481,11 @@ body.menu-open .header-book, html.from-menu .header-book { opacity: 0; visibilit
 @media (max-width: 1100px) {
   .menu-links a { font-size: clamp(32px, 5.4vw, 56px); }
 }
-/* Вузький екран: низ меню — компактна симетрична група по центру:
+/* Вузький екран (до 1100 px, де повна адреса з телефоном уже не вміщаються в половину): низ меню — компактна симетрична група по центру:
    адреса, під нею телефон і Telegram в один рядок (обабіч центральної лінії), під ними кнопка на всю ширину */
-@media (max-width: 860px) {
+@media (max-width: 1100px) {
   .menu-foot { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; row-gap: 0; align-items: baseline; font-size: 15px; text-align: center; }
+  .menu-foot-half { display: contents; }
   .menu-addr { grid-column: 1 / -1; margin-bottom: 2px; white-space: normal; }
   .menu-phone { justify-self: end; }
   .menu-tg { justify-self: start; }
@@ -678,7 +698,16 @@ html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 .svc-full-top { display: flex; flex-direction: column; gap: 14px; }
 .svc-full .svc-price { margin-top: 0; }
 .svc-desc { color: var(--ink-2); font-size: 15px; line-height: 1.55; }
-.svc-full-cta { margin-top: auto; padding-top: 6px; }
+.svc-full-cta { margin-top: auto; padding-top: 6px; display: flex; flex-wrap: wrap; gap: 10px; }
+/* Ціна словами («за домовленістю») — той самий стиль, але менша, щоб на вузьких картках не ламалась на рядки */
+.svc-price-text { font-size: clamp(22px, 1.9vw, 28px); letter-spacing: -.01em; text-wrap: balance; }
+/* Другорядна кнопка «Як це працює» — стриманіша за головну */
+.svc-how { color: var(--ink-2); }
+/* Дві кнопки бізнес-карток — компактніші, щоб стояли поряд на звичайній ширині картки */
+.svc-full-cta:has(.svc-how) { gap: 8px; }
+.svc-full-cta:has(.svc-how) .btn { padding: 0 13px 0 15px; gap: .4em; letter-spacing: .02em; font-size: 12px; }
+.svc-how:hover, .svc-how:focus-visible { color: var(--white); }
+@media (max-width: 520px) { .svc-full-cta:has(.svc-how) { flex-direction: column; } .svc-full-cta:has(.svc-how) .btn { width: 100%; } }
 
 /* ---------- Портфоліо ---------- */
 
@@ -1067,6 +1096,12 @@ html.wr-intro .intro {
    і без проміжного кадру; шапка — та сама (site-header). Далі шторку піднімає скрипт у layout.js (wrCurtainLift).
    Браузери без View Transitions просто відкривають сторінку з опущеною шторкою (критичний CSS у <head>). */
 body.menu-open .menu-wave { view-transition-name: menu-curtain; }
+html.nav-leaving .nav-loader, html.from-menu .nav-loader { view-transition-name: nav-loader; }
+/* Після кліку по пункту меню: пункти й низ меню зникають одразу (без плавності — браузер «заморожує» стару сторінку
+   для переходу вже за ~0,1–0,2 с, і напівпрозорі пункти лишились би на кадрі), шторка стає суцільною, як опущена
+   шторка нової сторінки; лишається лише шторка з лоадером-хвилею */
+html.nav-leaving .menu-inner { opacity: 0; transition: none; }
+html.nav-leaving .menu-wave-fill { fill: var(--black); }
 html.from-menu .page-curtain { view-transition-name: menu-curtain; }
 html.from-menu::view-transition-group(*), html.from-menu::view-transition-new(*) { animation: none; }
 html.from-menu::view-transition-old(*) { display: none; }

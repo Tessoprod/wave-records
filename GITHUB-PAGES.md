@@ -117,6 +117,7 @@ GitHub Pages безкоштовно публікує сайт з вашого р
 | `texts.json` | Усі тексти сторінок. `"visible": false` приховує блок |
 | `settings.json` | Назва, домен, ID Google Tag Manager, Google Analytics, Meta Pixel |
 | `privacy-policy.md`, `agreement.md` | Юридичні сторінки (`## Заголовок`, `- пункт`, `**жирний**`) |
+| `services.json`, блок `business` | Послуги для бізнесу (блок BUSINESS на сторінці Послуг): `name`, `price`, `description`; у кожної картки кнопки «Замовити в Telegram» і «Як це працює» (питання з id `business` у `faq.json`) |
 | `services.json`, поля `id` і `link` | Необов'язкові: `"id": "distribution"` дає картці на сторінці Послуг якір (`/services#distribution`); `"link": "distribution"` у картки на головній веде прямо до неї |
 | `faq.json` | Сторінка «Питання та відповіді» (/faq/): групи з `id`, у кожній питання (`q`) і відповідь (`a`). У відповіді: `**жирний**`, новий абзац — порожній рядок (`
 

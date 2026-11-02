@@ -125,6 +125,7 @@ export const BLOCKS = [
       { name: 'text', label: 'Вступ', type: 'textarea' },
       { name: 'sound_title', label: 'Блок 1 — назва', type: 'text' },
       { name: 'media_title', label: 'Блок 2 — назва', type: 'text' },
+      { name: 'business_title', label: 'Блок 3 — назва', type: 'text' },
       { name: 'media_cta', label: 'Кнопка для Media | PR', type: 'text' },
     ],
     defaults: {
@@ -132,6 +133,7 @@ export const BLOCKS = [
       text: 'Від години запису до готового релізу з обкладинкою та розсилкою.',
       sound_title: 'Sound',
       media_title: 'Media | PR',
+      business_title: 'BUSINESS',
       media_cta: 'Замовити в Telegram',
     },
   },

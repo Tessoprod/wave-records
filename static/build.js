@@ -194,6 +194,8 @@ async function main() {
   const homeServices = (services.home || []).map((s, i) => row(s, i, s.button !== 'services'));
   const sound = (services.sound || []).map((s, i) => row(s, i, s.button !== 'telegram'));
   const media = (services.media || []).map((s, i) => ({ ...row(s, i, s.button === 'book'), category: 'media' }));
+  // BUSINESS: дві кнопки — «Замовити в Telegram» і «Як це працює» (/faq#business)
+  const business = (services.business || []).map((s, i) => ({ ...row(s, i, false), category: 'business' }));
 
   // Треки
   const vocal = tracksIn('vocal');
@@ -215,7 +217,7 @@ async function main() {
   // Рендер сторінок
   const pages = {
     'index.html': views.homePage({ homeServices, tracks: homeTracks, faq }),
-    'services/index.html': views.servicesPage({ sound, media }),
+    'services/index.html': views.servicesPage({ sound, media, business }),
     'portfolio/index.html': views.portfolioPage({ vocal, music, b2b }),
     'about/index.html': views.aboutPage({ photos }),
     'book/index.html': views.staticBookPage({ booking }),
