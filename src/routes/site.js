@@ -30,7 +30,7 @@ export function registerSite(r) {
     const homeServices = q('SELECT * FROM services WHERE show_on_home = 1 ORDER BY home_sort, sort, id').all();
     let tracks = q('SELECT * FROM tracks WHERE on_home = 1 ORDER BY sort, id LIMIT 4').all();
     if (!tracks.length) tracks = q('SELECT * FROM tracks ORDER BY created_at DESC LIMIT 4').all();
-    return views.homePage({ homeServices, tracks });
+    return views.homePage({ homeServices, tracks, faq: loadFaq() });
   }, '/'));
 
   r.get('/home', (req, res) => { res.writeHead(301, { Location: '/' }); res.end(); });

@@ -488,6 +488,7 @@ function menuWave() {
   const blur = menu.querySelector('.menu-blur');
   const links = menu.querySelectorAll('.menu-links li');
   const foot = menu.querySelector('.menu-foot');
+  const faqPill = menu.querySelector('.menu-faq-wrap');
   if (!fill || !edge) return;
   menu.classList.add('is-animated');
   const w = { y: -14, a: 0, ph: 0 };
@@ -503,6 +504,7 @@ function menuWave() {
       const oneCol = matchMedia('(max-width: 640px)').matches;
       links.forEach((li, i) => gsap.set(li, oneCol ? { opacity: 0, x: 0, y: 24 } : { opacity: 0, y: 0, x: i < 3 ? -70 : 70 }));
       gsap.set(foot, { opacity: 0, y: 14 });
+      if (faqPill) gsap.set(faqPill, { opacity: 0, scale: 0.85 });
       gsap.set(edge, { opacity: 0.85 });
       Object.assign(w, { y: -14, a: 0, ph: 0 });
       tl.to(blur, { opacity: 1, duration: 0.5, ease: 'power2.out' }, 0)
@@ -513,9 +515,11 @@ function menuWave() {
         .call(resolve, null, 0.6)
         .to(links, { opacity: 1, x: 0, y: 0, duration: 0.8, ease: EASE, stagger: (i) => (i % 3) * 0.08 + (i < 3 ? 0 : 0.04) }, 0.5)
         .to(foot, { opacity: 1, y: 0, duration: 0.6, ease: SOFT }, 0.8);
+      // FAQ на центральній лінії — останнім, стримано (масштаб; центрування — властивість translate у CSS)
+      if (faqPill) tl.to(faqPill, { opacity: 1, scale: 1, duration: 0.6, ease: SOFT }, 0.85);
     } else {
       gsap.set(edge, { opacity: 0.85 });
-      tl.to([links, foot], { opacity: 0, duration: 0.25, ease: 'power2.in', stagger: 0.02 }, 0)
+      tl.to([links, foot, faqPill].filter(Boolean), { opacity: 0, duration: 0.25, ease: 'power2.in', stagger: 0.02 }, 0)
         .to(w, { y: -14, ph: 0, duration: 0.7, ease: 'power3.inOut', onUpdate: draw }, 0.12)
         .to(w, { a: 8, duration: 0.32, ease: 'sine.out' }, 0.12)
         .to(w, { a: 0, duration: 0.38, ease: 'sine.in' }, 0.44)

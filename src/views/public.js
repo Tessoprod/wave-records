@@ -58,12 +58,13 @@ function telegramUrl() {
 
 /* ---------- /home ---------- */
 
-export function homePage({ homeServices, tracks }) {
+export function homePage({ homeServices, tracks, faq = null }) {
   const hero = block('home.hero');
   const svc = block('home.services');
   const works = block('home.works');
   const why = block('home.why');
   const steps = block('home.steps');
+  const homeFaq = faqHomeItems(faq);
 
   // Перший екран і Послуги — у спільному контейнері: на широкому екрані motion.js накладає Послуги
   // поверх першого екрана й закріплює його, поки картки розходяться з центру на свої місця
@@ -151,6 +152,19 @@ export function homePage({ homeServices, tracks }) {
         <li class="step"><span class="step-dot" aria-hidden="true"></span><span class="num">${String(i + 1).padStart(2, '0')}</span><p class="step-title">${it.title}</p></li>`)}
       </ol>
       <div class="steps-cta">${btn('/book', hero.cta_book || 'Записатися', 'neon', icon.arrow, 'data-cta="steps_book"')}</div>
+    </div>
+  </section>` : ''}
+
+  ${homeFaq.length ? html`
+  <!-- Три питання з поля home у faq.json; поведінка — як на сторінці FAQ (site.js, motion.js), але без хешу в адресі -->
+  <section class="section section-faq">
+    <div class="container" data-faq>
+      ${FAQ_DEFS}
+      <header class="sec-head">
+        <h2 class="h2">${faq.title || 'Питання та відповіді'}</h2>
+        ${btn('/faq', 'Усі запитання', 'glass', icon.arrow, 'data-cta="home_faq"')}
+      </header>
+      <div class="faq-list">${homeFaq.map((it, i) => faqItem(it, i + 1, 'faq-home', false))}</div>
     </div>
   </section>` : ''}`;
 
@@ -579,6 +593,27 @@ const faqPlain = (src) => String(src || '').replace(/\r/g, '').replace(/\*\*(.+?
 /** Лінія-хвиля під питанням (промальовується при відкритті): 40 півхвиль на ширину блоку. */
 const FAQ_WAVE = `M0 4${Array.from({ length: 40 }, (_, i) => (i ? ` T${(i + 1) * 10} 4` : ' Q5 0 10 4')).join('')}`;
 
+const FAQ_ICON = raw('<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="faq-icon-v" d="M12 5v14"/><path class="faq-icon-h" d="M5 12h14"/><path class="faq-icon-w" d="M3 12q2.25-4 4.5 0t4.5 0t4.5 0t4.5 0"/></svg>');
+// Градієнт лінії-хвилі (рожевий → ціановий) — один на сторінку, поруч зі списком питань
+const FAQ_DEFS = raw('<svg class="faq-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs><linearGradient id="faq-grad" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#FF2E9A"/><stop offset="1" stop-color="#00E5FF"/></linearGradient></defs></svg>');
+/** Одне питання — скляний рядок details/summary (сторінка FAQ і блок на головній). withId — id для посилань #id. */
+function faqItem(it, n, groupName, withId = true) {
+  return html`
+          <details class="faq-item glass glass-card" ${withId && it.id ? raw(`id="${esc(it.id)}"`) : ''} name="${groupName}" data-faq-item>
+            <summary class="faq-q"><span class="faq-num" aria-hidden="true">${String(n).padStart(2, '0')}</span><span class="faq-q-text">${it.q}</span>${FAQ_ICON}</summary>
+            <div class="faq-a">
+              <svg class="faq-wave" viewBox="0 0 400 8" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="${FAQ_WAVE}"/></svg>
+              <div class="faq-a-body">${faqAnswer(it.a)}</div>
+            </div>
+          </details>`;
+}
+/** Питання для головної: id зі списку home у faq.json, у тому самому порядку. */
+export function faqHomeItems(faq) {
+  const all = new Map();
+  for (const g of (faq && Array.isArray(faq.groups) ? faq.groups : [])) for (const it of (g && Array.isArray(g.items) ? g.items : [])) if (it && it.id && it.q) all.set(it.id, it);
+  return (faq && Array.isArray(faq.home) ? faq.home : []).map((id) => all.get(id)).filter(Boolean);
+}
+
 export function faqPage(faq) {
   const data = faq && typeof faq === 'object' ? faq : {};
   const title = String(data.title || 'Питання та відповіді');
@@ -588,7 +623,6 @@ export function faqPage(faq) {
   const c = block('contacts');
   const tg = telegramUrl();
   let n = 0;
-  const toggleIcon = raw('<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="faq-icon-v" d="M12 5v14"/><path class="faq-icon-h" d="M5 12h14"/><path class="faq-icon-w" d="M3 12q2.25-4 4.5 0t4.5 0t4.5 0t4.5 0"/></svg>');
 
   const ld = {
     '@context': 'https://schema.org',
@@ -608,8 +642,8 @@ export function faqPage(faq) {
   ${groups.length ? html`
   <!-- Ліворуч (на телефоні — ряд чіпсів угорі) групи; праворуч питання. Логіка — site.js (відкриття, хеш, підсвітка групи),
        анімація відкриття — motion.js (wrMotion.faqAnim). Без JS працюють нативні details/summary. -->
-  <div class="container faq" data-faq>
-    <svg class="faq-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs><linearGradient id="faq-grad" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#FF2E9A"/><stop offset="1" stop-color="#00E5FF"/></linearGradient></defs></svg>
+  <div class="container faq" data-faq data-faq-hash>
+    ${FAQ_DEFS}
     <nav class="faq-nav" aria-label="Групи питань" data-faq-nav>
       <ol class="faq-nav-list" role="list">
         ${groups.map((g, i) => html`<li><a class="faq-nav-link glass" href="#${g.id}" data-faq-link><span class="faq-nav-num" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span><span>${g.title}</span></a></li>`)}
@@ -622,14 +656,7 @@ export function faqPage(faq) {
         <div class="faq-list">
           ${g.items.map((it) => {
             n += 1;
-            return html`
-          <details class="faq-item glass glass-card" ${it.id ? raw(`id="${esc(it.id)}"`) : ''} name="faq-${g.id}" data-faq-item>
-            <summary class="faq-q"><span class="faq-num" aria-hidden="true">${String(n).padStart(2, '0')}</span><span class="faq-q-text">${it.q}</span>${toggleIcon}</summary>
-            <div class="faq-a">
-              <svg class="faq-wave" viewBox="0 0 400 8" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="${FAQ_WAVE}"/></svg>
-              <div class="faq-a-body">${faqAnswer(it.a)}</div>
-            </div>
-          </details>`;
+            return faqItem(it, n, `faq-${g.id}`);
           })}
         </div>
       </section>`)}

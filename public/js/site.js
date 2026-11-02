@@ -497,6 +497,7 @@
   const faq = $('[data-faq]');
   if (faq) {
     const items = $$('[data-faq-item]', faq);
+    const useHash = faq.hasAttribute('data-faq-hash'); // хеш в адресі — лише на сторінці FAQ, не на головній
     const shown = (d) => d.open && !d.classList.contains('is-closing');
     const sync = (d) => $('summary', d).setAttribute('aria-expanded', String(shown(d)));
     const setHash = (id) => {
@@ -514,12 +515,12 @@
         d.classList.remove('is-closing');
         d.open = true;
         sync(d);
-        if (hash && d.id) setHash(d.id);
+        if (useHash && hash && d.id) setHash(d.id);
         if (anim) await anim(d, true);
       } else {
         d.classList.add('is-closing');
         sync(d);
-        if (hash && d.id && location.hash === `#${d.id}`) setHash('');
+        if (useHash && hash && d.id && location.hash === `#${d.id}`) setHash('');
         if (anim) {
           const done = await anim(d, false);
           if (!done || !d.classList.contains('is-closing')) return; // поки закривалось, питання відкрили знову
@@ -559,6 +560,8 @@
         const lenis = window.wrMotion?.lenis;
         if (smooth && lenis) lenis.scrollTo(d);
         else d.scrollIntoView({ block: 'start', behavior: smooth && !reduceMotion ? 'smooth' : 'instant' });
+        // Після стрибка сторінки плавна прокрутка ряду чіпсів може перерватися — ставимо активний чіпс одразу
+        if (!smooth) updateActive('instant');
       });
     };
     openFromHash(false);
@@ -575,32 +578,42 @@
     const navRow = $('.faq-nav-list', faq);
     const groups = $$('[data-faq-group]', faq);
     let active = null;
-    const setActive = (id) => {
-      if (id === active) return;
+    let updateActive = () => {};
+    // Ряд чіпсів на телефоні гортається вбік так, щоб активний чіпс було видно
+    const showChip = (a, behavior) => {
+      if (a && navRow && navRow.scrollWidth > navRow.clientWidth + 1) {
+        navRow.scrollTo({ left: a.offsetLeft - (navRow.clientWidth - a.offsetWidth) / 2, behavior });
+      }
+    };
+    const setActive = (id, behavior = reduceMotion ? 'auto' : 'smooth') => {
+      if (id === active) {
+        // Повторно — лише щоб миттєво доставити чіпс у видиму зону (після стрибка сторінки чи завантаження шрифтів)
+        if (behavior === 'instant') showChip(links.find((a) => a.hash === `#${id}`), 'instant');
+        return;
+      }
       active = id;
       links.forEach((a) => {
         const on = a.hash === `#${id}`;
         a.classList.toggle('is-active', on);
         if (on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
-        // Ряд чіпсів на телефоні гортається вбік так, щоб активний чіпс було видно
-        if (on && navRow && navRow.scrollWidth > navRow.clientWidth + 1) {
-          navRow.scrollTo({ left: a.offsetLeft - (navRow.clientWidth - a.offsetWidth) / 2, behavior: reduceMotion ? 'auto' : 'smooth' });
-        }
+        if (on) showChip(a, behavior);
       });
     };
     // Поточна — остання група, чий верх уже вище лінії на 35 % висоти екрана (угорі сторінки — перша)
     if (groups.length) {
       let ticking = false;
-      const update = () => {
+      const update = updateActive = (behavior) => {
         ticking = false;
         const line = innerHeight * 0.35;
         let cur = groups[0];
         for (const g of groups) if (g.getBoundingClientRect().top <= line) cur = g;
-        setActive(cur.id);
+        setActive(cur.id, typeof behavior === 'string' ? behavior : undefined);
       };
-      addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
-      addEventListener('resize', update, { passive: true });
-      update();
+      addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(() => update()); } }, { passive: true });
+      addEventListener('resize', () => update(), { passive: true });
+      update('instant');
+      // Шрифти змінюють ширину чіпсів — після них ще раз ставимо активний на місце
+      document.fonts?.ready.then(() => update('instant'));
     }
   }
 

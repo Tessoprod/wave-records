@@ -49,6 +49,9 @@ export const NAV = [
   ['/contacts', 'Контакти'],
 ];
 
+/** Футер, «Сторінки»: дві колонки по три (заповнюються згори донизу), FAQ — одразу після «Запис». */
+const FOOTER_PAGES = [...NAV.slice(1, 5), ['/faq', 'FAQ'], ...NAV.slice(5)];
+
 export function telLink(phone) {
   return `tel:${String(phone || '').replace(/[^\d+]/g, '')}`;
 }
@@ -175,12 +178,18 @@ w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.con
       <path class="menu-wave-edge" d="M100 100 L0 100" stroke="url(#menu-edge)" vector-effect="non-scaling-stroke"/>
     </svg>
     <nav class="menu-inner container" aria-label="Головне меню">
-      <ol class="menu-links" role="list">${navLinks}</ol>
+      <!-- Сітка 2×3 пунктів; FAQ — невелика скляна пігулка на центральній лінії між першим і другим рядом
+           (на телефоні замість неї — текстове посилання в нижній групі) -->
+      <div class="menu-main">
+        <ol class="menu-links" role="list">${navLinks}</ol>
+        <div class="menu-faq-wrap"><a class="btn btn-glass btn-sm menu-faq" href="/faq" ${current === '/faq' ? raw('aria-current="page"') : ''}>FAQ</a></div>
+      </div>
       <!-- Низ меню — одна лінія: адреса — телефон — Telegram — «Записатися» (на телефоні — компактна група по центру) -->
       <div class="menu-foot">
         <p class="menu-contact menu-addr">${c.address}</p>
         <p class="menu-contact menu-phone"><a href="${telLink(c.phone)}">${c.phone}</a></p>
         ${c.telegram ? html`<p class="menu-contact menu-tg"><a href="https://t.me/${c.telegram}" rel="noopener">Telegram @${c.telegram}</a></p>` : ''}
+        <p class="menu-contact menu-faq-link"><a href="/faq">Питання та відповіді (FAQ)</a></p>
         <a class="btn btn-neon menu-book" href="/book">Записатися${icon.arrow}</a>
       </div>
     </nav>
@@ -215,7 +224,7 @@ w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.con
       </div>
       <div>
         <h2 class="footer-h">Сторінки</h2>
-        <ul class="footer-links">${[...NAV.slice(1), ['/faq', 'FAQ']].map(([href, label]) => html`<li><a href="${href}">${label}</a></li>`)}</ul>
+        <ul class="footer-links">${FOOTER_PAGES.map(([href, label]) => html`<li><a href="${href}">${label}</a></li>`)}</ul>
       </div>
     </div>
     <div class="container footer-bottom">

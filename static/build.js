@@ -211,7 +211,7 @@ async function main() {
 
   // Рендер сторінок
   const pages = {
-    'index.html': views.homePage({ homeServices, tracks: homeTracks }),
+    'index.html': views.homePage({ homeServices, tracks: homeTracks, faq }),
     'services/index.html': views.servicesPage({ sound, media }),
     'portfolio/index.html': views.portfolioPage({ vocal, music, b2b }),
     'about/index.html': views.aboutPage({ photos }),
