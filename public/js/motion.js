@@ -26,9 +26,14 @@ const motion = window.wrMotion = {
 // pagereveal (з <head>) каже, чи прийшли через View Transition; motion.js може запуститися раніше за нього
 const revealed = window.wrRevealed || Promise.resolve();
 const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
-// Шрифти для появи назви: чекаємо не довше 2,5 с від старту сторінки (відлік іде паралельно з інтро чи шторкою,
-// тож після них назва з'являється без паузи; і завжди раніше за запобіжник у 3 с — інакше текст мигне)
-const fontsForTitle = Promise.race([fontsReady, new Promise((r) => setTimeout(r, 2500))]);
+// Шрифти для появи назви: назву ділимо на рядки й показуємо лише зі справжнім шрифтом заголовків (Archivo Black).
+// З запасним шрифтом інакше переносяться рядки (ширина .about-title — у ch, що залежить від шрифту) і змінюється
+// розмір — заголовок «стрибав» би після завантаження. Відлік іде від старту сторінки, паралельно з інтро чи шторкою;
+// крайній строк 6 с (якщо шрифт так і не завантажився — показуємо запасним).
+const fontsForTitle = Promise.race([
+  Promise.all([fontsReady, document.fonts?.load('400 1em "Archivo Black"', 'ВІД').catch(() => {})]),
+  new Promise((r) => setTimeout(r, 6000)),
+]);
 
 /* ---------- Плавний скрол ---------- */
 function smoothScroll() {
@@ -415,7 +420,13 @@ function logoEq() {
       // Футер: смужки виростають, коли він уперше з'являється на екрані
       if (inFooter && en.isIntersecting && !l.appeared) { l.appeared = true; appear(l); }
     }).observe(l.logo);
-    if (!inFooter) motion.entered.then(() => { l.appeared = true; appear(l); });
+    // Шапка: смужки виростають лише при першому вході (після інтро). При переходах між сторінками
+    // (з меню, View Transition, повторне відкриття) логотип уже на місці — не зникає й не мигає
+    if (!inFooter) {
+      l.appeared = true;
+      if (root.classList.contains('wr-intro')) { l.st.forEach((st) => { st.grow = 0; }); motion.entered.then(() => appear(l)); }
+      else l.st.forEach((st) => { st.grow = 1; });
+    }
     if (finePointer) l.logo.addEventListener('mouseenter', () => wave(l));
     l.logo.addEventListener('focus', () => { if (l.logo.matches(':focus-visible')) wave(l); });
   });
@@ -457,9 +468,11 @@ function waveDrawer(fill, edge, w) {
   };
 }
 
-/* Шторка переходу з меню: на новій сторінці вона опущена з першого кадру (html.from-menu); коли готові
-   шрифти й перша відмальовка, піднімається тією самою хвилею, що й при закритті меню. */
+/* Шторка переходу з меню: на новій сторінці вона опущена з першого кадру (html.from-menu). Піднімає її вбудований
+   скрипт у layout.js (window.wrCurtainLift) — одразу, без очікування GSAP; код нижче — запасний варіант. */
 function curtainLift() {
+  // Зазвичай шторку вже піднімає вбудований скрипт у layout.js (не чекаючи GSAP) — лише дочекатися його
+  if (window.wrCurtainLift) return window.wrCurtainLift.then(() => { motion.lenis?.start(); });
   const c = document.querySelector('[data-page-curtain]');
   const finish = () => {
     root.classList.remove('from-menu');
@@ -473,7 +486,8 @@ function curtainLift() {
   draw();
   motion.lenis?.stop();
   const firstPaint = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  const fontsOrTimeout = Promise.race([fontsReady, new Promise((r) => setTimeout(r, 1500))]);
+  // Чекаємо лише шрифти (не довше ~300 мс) і першу відмальовку; 3D, фото, аудіо й рідина догружаються вже після
+  const fontsOrTimeout = Promise.race([fontsReady, new Promise((r) => setTimeout(r, 300))]);
   return fontsOrTimeout.then(firstPaint).then(() => new Promise((resolve) => {
     gsap.set(edge, { opacity: 0.85 });
     gsap.timeline({ onComplete: () => { finish(); motion.lenis?.start(); resolve(); } })
@@ -819,10 +833,10 @@ async function entrance() {
 async function conductor() {
   await motion.entered;
   if (failed()) { staticPage(); return; }
+  // Поява вже почалась: запобіжник не показує заголовок, поки чекаємо шрифт (інакше — запасним шрифтом, а потім стрибок)
+  motion.contentStarted = true;
   window.wrArmFailsafe?.();
   await fontsForTitle; // рядки ділимо за справжніми шрифтами (див. fontsForTitle)
-  if (failed()) { staticPage(); return; }
-  motion.contentStarted = true;
   heroIntro();
   pageTitle();
   // Решта — слідом за назвою, щоб рух був шаруватим

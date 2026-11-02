@@ -111,6 +111,10 @@ w.addEventListener('pageswap',function(e){var v=e.viewTransition&&quiet(e.viewTr
 function reveal(){d.classList.remove('wr-anim','wr-intro','from-menu');d.classList.add('wr-failsafe');del('wr_from_menu')}
 function check(){if(!(w.wrMotion&&w.wrMotion.ready))reveal()}document.addEventListener('DOMContentLoaded',function(){setTimeout(check,0)});setTimeout(check,10000);
 w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.contentStarted))reveal()},3000)}})(document.documentElement,window)</script>
+  <meta name="color-scheme" content="dark">
+  <!-- Критичний CSS: темний фон з першого кадру (без сірого чи білого проміжку між сторінками) і опущена шторка
+       в стані from-menu — така сама, як шторка меню (темна заливка #111111 на весь екран). Решта — у site.css -->
+  <style>html,body{background:#111111;color-scheme:dark}.page-curtain{display:none}html.from-menu .page-curtain{display:block;position:fixed;inset:0;z-index:45}.page-curtain svg{position:absolute;inset:0;width:100%;height:100%}.page-curtain-fill{fill:#111111}.page-curtain-edge{fill:none;opacity:0}</style>
   <title>${fullTitle}</title>
   <meta name="description" content="${desc}">
   <meta name="theme-color" content="#111111">
@@ -141,6 +145,21 @@ w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.con
       <path class="page-curtain-edge" d="M100 112 L0 112" stroke="url(#curtain-edge)" vector-effect="non-scaling-stroke"/>
     </svg>
   </div>
+  <!-- Підйом шторки після переходу з меню — тут, а не в motion.js: не чекає GSAP, 3D, фото, аудіо й рідину.
+       Чекає лише шрифти (≤ 300 мс), фон (bg.js, ≤ 800 мс) і першу відмальовку; хвиля — та сама, що при закритті меню
+       (ті самі криві й тривалість 0,75 с). Після підйому знімає from-menu і позначку; motion.js чекає window.wrCurtainLift. -->
+  <script>(function(d,w){if(!d.classList.contains('from-menu'))return;
+var c=document.querySelector('[data-page-curtain]'),fill=c.querySelector('.page-curtain-fill'),edge=c.querySelector('.page-curtain-edge');
+function draw(y,a,ph){function v(k){return y+a*Math.sin(ph+k*1.9)}function e(k){return v(k).toFixed(2)}var m=(2*v(3)-v(2)).toFixed(2),cv='C83 '+e(1)+' 67 '+e(2)+' 50 '+e(3)+' C33 '+m+' 17 '+e(5)+' 0 '+e(6);fill.setAttribute('d','M0 0 L100 0 L100 '+e(0)+' '+cv+' Z');edge.setAttribute('d','M100 '+e(0)+' '+cv)}
+function wait(ms){return new Promise(function(r){setTimeout(r,ms)})}
+w.wrCurtainLift=new Promise(function(done){
+var fonts=Promise.race([document.fonts?document.fonts.ready:Promise.resolve(),wait(300)]);
+var bg=new Promise(function(r){(function chk(){var b=document.querySelector('[data-bg]');if(!b||b.classList.contains('is-ready'))r();else requestAnimationFrame(chk)})()});
+Promise.all([fonts,Promise.race([bg,wait(800)])]).then(function(){requestAnimationFrame(function(){requestAnimationFrame(start)})});
+function start(){var t0=performance.now();edge.style.opacity='.85';
+(function f(now){var s=Math.max(0,now-t0),t=Math.min(1,s/750),p=t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,a=s<320?8*Math.sin(s/320*Math.PI/2):s<720?8*Math.cos((s-320)/400*Math.PI/2):0;
+draw(112-126*p,a,3.2*(1-p));if(t<1)requestAnimationFrame(f);else{d.classList.remove('from-menu');try{sessionStorage.removeItem('wr_from_menu')}catch(e){}done()}})(t0)}
+})})(document.documentElement,window)</script>
   <!-- Інтро: показується лише з html.wr-intro (див. скрипт у <head>), анімацію веде motion.js -->
   <div class="intro" data-intro>
     <div class="intro-half intro-top" aria-hidden="true"></div>
@@ -180,8 +199,7 @@ w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.con
       <path class="menu-wave-edge" d="M100 100 L0 100" stroke="url(#menu-edge)" vector-effect="non-scaling-stroke"/>
     </svg>
     <nav class="menu-inner container" aria-label="Головне меню">
-      <!-- Сітка 2×3 пунктів; FAQ — невелика скляна пігулка на центральній лінії між першим і другим рядом
-           (на телефоні замість неї — текстове посилання в нижній групі) -->
+      <!-- Сітка 2×3 пунктів; FAQ — скляна пігулка рівно в центрі екрана (на телефоні — така сама пігулка в нижній групі) -->
       <div class="menu-main">
         <ol class="menu-links" role="list">${navLinks}</ol>
         <div class="menu-faq-wrap"><a class="btn btn-glass btn-sm menu-faq" href="/faq" ${current === '/faq' ? raw('aria-current="page"') : ''}>FAQ</a></div>
@@ -191,7 +209,7 @@ w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.con
         <p class="menu-contact menu-addr">${c.address}</p>
         <p class="menu-contact menu-phone"><a href="${telLink(c.phone)}">${c.phone}</a></p>
         ${c.telegram ? html`<p class="menu-contact menu-tg"><a href="https://t.me/${c.telegram}" rel="noopener">Telegram @${c.telegram}</a></p>` : ''}
-        <p class="menu-contact menu-faq-link"><a href="/faq">Питання та відповіді (FAQ)</a></p>
+        <a class="btn btn-glass btn-sm menu-faq-mob" href="/faq" ${current === '/faq' ? raw('aria-current="page"') : ''}>FAQ</a>
         <a class="btn btn-neon menu-book" href="/book">Записатися${icon.arrow}</a>
       </div>
     </nav>
