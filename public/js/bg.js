@@ -1,5 +1,5 @@
-/* Wave Records — динамічний фон: стрічки звукових хвиль, точки, зерно з паралаксом
-   і (лише з мишею) дрібні частинки, що тонко реагують на курсор.
+/* Wave Records — динамічний фон: стрічки звукових хвиль, точки, зерно з паралаксом.
+   Рідину за курсором малює окремий canvas (fluid.js); тут стрічки лише розступаються за її слідом.
    Шари (від дальнього до ближнього):
      .bg-dots   — сітка точок, при прокрутці зсувається найповільніше (CSS transform);
      canvas     — дві групи стрічок хвиль: дальні (повільні, тьмяні) і ближні;
@@ -109,7 +109,10 @@
             + 0.45 * Math.sin(u * Math.PI * 2 * f2 - phase * 1.3 + k)
             + 0.2 * Math.sin(u * Math.PI * 2 * f3 + phase * 2.1)
           );
-        if (x === -step) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        let px = x;
+        let py = y;
+        if (wakePts.length) { const w = wakeAt(x, y); px += w.x; py += w.y; }
+        if (x === -step) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
       ctx.strokeStyle = grad;
       ctx.lineWidth = s === Math.floor(r.strands / 2) ? 1.6 : 1;
@@ -119,104 +122,54 @@
     ctx.globalAlpha = 1;
   }
 
-  /* ---------- Частинки, що тонко реагують на курсор ----------
-     Кілька десятків точок 1–2 px (білі, рожеві, ціанові, низька непрозорість) повільно дрейфують;
-     у радіусі ~180 px від курсора м'яко відштовхуються й закручуються. За швидким рухом миші лишається
-     ледь помітний слід, що згасає за пів секунди. Лише для миші і без prefers-reduced-motion;
-     малюються в тому самому canvas і циклі, що й стрілки (на паузі разом із ним). */
-  const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
-  const MOTE_COLORS = [[245, 245, 245], [245, 245, 245], [255, 46, 154], [0, 229, 255]];
-  const RADIUS = 180;
-  const TRAIL_LIFE = 0.5;
-  const motes = [];
-  const sparks = [];
-  const mouse = { x: 0, y: 0, vx: 0, vy: 0, t: 0, on: false };
-  if (fine && !reduceMotion) {
-    for (let i = 0; i < 46; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const sp = 4 + Math.random() * 8; // px/с — ледь помітний дрейф
-      motes.push({
-        x: Math.random() * innerWidth, y: Math.random() * innerHeight,
-        dx: Math.cos(ang) * sp, dy: Math.sin(ang) * sp, vx: 0, vy: 0,
-        r: 0.6 + Math.random() * 0.4, c: MOTE_COLORS[i % MOTE_COLORS.length],
-        a: 0.24 + Math.random() * 0.2, ph: Math.random() * Math.PI * 2,
-      });
-    }
-    addEventListener('pointermove', (e) => {
-      if (e.pointerType !== 'mouse') return;
-      const now = performance.now();
-      if (mouse.on) {
-        const dt = Math.max(8, now - mouse.t) / 1000;
-        mouse.vx = (e.clientX - mouse.x) / dt;
-        mouse.vy = (e.clientY - mouse.y) / dt;
-        // Слід лише за швидким рухом: кілька частинок на подію, загалом не більше 36
-        const speed = Math.hypot(mouse.vx, mouse.vy);
-        if (speed > 900 && sparks.length < 36) {
-          for (let k = 0; k < 2; k++) {
-            sparks.push({
-              x: e.clientX + (Math.random() - 0.5) * 6, y: e.clientY + (Math.random() - 0.5) * 6,
-              vx: -mouse.vx * 0.03 + (Math.random() - 0.5) * 30, vy: -mouse.vy * 0.03 + (Math.random() - 0.5) * 30,
-              life: 0, r: 0.6 + Math.random() * 0.5, c: MOTE_COLORS[(Math.random() * 4) | 0],
-            });
-          }
-        }
-      }
-      mouse.x = e.clientX; mouse.y = e.clientY; mouse.t = now; mouse.on = true;
-    }, { passive: true });
-    document.documentElement.addEventListener('pointerleave', () => { mouse.on = false; }, { passive: true });
-  }
-
-  function updateParticles(dt, t) {
-    for (const m of motes) {
-      if (mouse.on) {
-        const ddx = m.x - mouse.x;
-        const ddy = m.y - mouse.y;
-        const d = Math.hypot(ddx, ddy);
-        if (d < RADIUS && d > 0.5) {
-          // Відштовхування від курсора плюс закручування навколо нього, слабшає до краю радіуса
-          const f = (1 - d / RADIUS) ** 2;
-          const nx = ddx / d;
-          const ny = ddy / d;
-          m.vx += (nx * 140 - ny * 90) * f * dt;
-          m.vy += (ny * 140 + nx * 90) * f * dt;
-        }
-      }
-      const damp = Math.pow(0.25, dt); // поштовх згасає приблизно за секунду
-      m.vx *= damp; m.vy *= damp;
-      m.x += (m.dx + m.vx) * dt;
-      m.y += (m.dy + m.vy) * dt;
-      // Хто вийшов за край — повертається з протилежного боку
-      if (m.x < -8) m.x = W + 8; else if (m.x > W + 8) m.x = -8;
-      if (m.y < -8) m.y = H + 8; else if (m.y > H + 8) m.y = -8;
-    }
-    for (let i = sparks.length - 1; i >= 0; i--) {
-      const sp = sparks[i];
-      sp.life += dt;
-      if (sp.life > TRAIL_LIFE) { sparks.splice(i, 1); continue; }
-      sp.x += sp.vx * dt; sp.y += sp.vy * dt;
-      sp.vx *= Math.pow(0.1, dt); sp.vy *= Math.pow(0.1, dt);
+  /* ---------- Слід рідини: стрічки розступаються там, де пройшов курсор ----------
+     fluid.js кладе у window.wrWake останні точки руху миші чи пальця ({ x, y, vx, vy, t }).
+     Кожна точка зсуває найближчі ділянки стрічок уздовж руху й трохи вбік від траєкторії —
+     ніби рідина за курсором злегка викривлює фон під собою. Вплив згасає за ~1,5 с. */
+  const WAKE_R = 150;
+  const WAKE_MAX = 22; // найбільший зсув, px
+  let wakePts = [];
+  function collectWake() {
+    const src = window.wrWake;
+    wakePts = [];
+    if (!src || !src.length) return;
+    const now = performance.now();
+    for (const p of src) {
+      const f = Math.exp(-((now - p.t) / 1000) * 2.4);
+      if (f < 0.03) continue;
+      const v = Math.hypot(p.vx, p.vy);
+      if (v < 30) continue;
+      wakePts.push(p.x, p.y, p.vx * f, p.vy * f, v * f);
     }
   }
-
-  function drawParticles(t) {
-    if (!motes.length && !sparks.length) return;
-    for (const m of motes) {
-      const tw = 0.75 + 0.25 * Math.sin(t * 0.8 + m.ph); // ледь помітне мерехтіння
-      ctx.fillStyle = rgba(m.c, (m.a * tw).toFixed(3));
-      ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill();
+  const wakeOut = { x: 0, y: 0 };
+  function wakeAt(x, y) {
+    let dx = 0;
+    let dy = 0;
+    for (let i = 0; i < wakePts.length; i += 5) {
+      const rx = x - wakePts[i];
+      const ry = y - wakePts[i + 1];
+      if (rx > WAKE_R * 2 || rx < -WAKE_R * 2 || ry > WAKE_R * 2 || ry < -WAKE_R * 2) continue;
+      const g = Math.exp(-(rx * rx + ry * ry) / (WAKE_R * WAKE_R)) * 0.012;
+      const vx = wakePts[i + 2];
+      const vy = wakePts[i + 3];
+      // Убік від траєкторії: перпендикуляр до руху, у той бік, де лежить точка
+      const side = vx * ry - vy * rx > 0 ? 1 : -1;
+      dx += g * (vx - vy * side * 0.7);
+      dy += g * (vy + vx * side * 0.7);
     }
-    for (const sp of sparks) {
-      ctx.fillStyle = rgba(sp.c, (0.42 * (1 - sp.life / TRAIL_LIFE)).toFixed(3));
-      ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2); ctx.fill();
-    }
+    // М'яке обмеження: без різких зламів навіть від дуже швидкого руху
+    wakeOut.x = WAKE_MAX * Math.tanh(dx / WAKE_MAX);
+    wakeOut.y = WAKE_MAX * Math.tanh(dy / WAKE_MAX);
+    return wakeOut;
   }
 
   function draw(t, scroll) {
     ctx.clearRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineJoin = 'round';
+    collectWake();
     for (const r of ribbons) drawRibbon(r, t, scroll);
-    drawParticles(t);
     ctx.globalCompositeOperation = 'source-over';
     if (dots) dots.style.transform = `translate3d(0, ${(-(scroll * DOTS_PARALLAX) % DOT_STEP).toFixed(2)}px, 0)`;
   }
@@ -248,7 +201,6 @@
     level.bass += ((a ? a.bass : 0) - level.bass) * 0.12;
     level.mid += ((a ? a.mid : 0) - level.mid) * 0.12;
     scrollShown += (scrollY - scrollShown) * 0.18;
-    updateParticles(dt, time);
     draw(time, scrollShown);
   }
   const start = () => { if (!raf) { prev = performance.now(); raf = requestAnimationFrame(frame); } };

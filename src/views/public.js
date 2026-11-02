@@ -1,4 +1,4 @@
-import { html, raw, nl2br, miniMarkdown } from '../html.js';
+import { html, raw, esc, nl2br, miniMarkdown } from '../html.js';
 import { layout, icon, telLink } from './layout.js';
 import { block } from '../content.js';
 import { getSettings } from '../settings.js';
@@ -544,6 +544,109 @@ export function contactsPage() {
     </a>` : ''}
   </section>`;
   return layout({ title: 'Контакти', path: '/contacts', description: `${c.studio}: ${c.address}, ${c.city}. ${c.phone}`, body });
+}
+
+/* ---------- /faq ---------- */
+
+/** Рядок відповіді: **жирний** і клікабельні посилання (у новій вкладці). */
+function faqInline(text) {
+  return esc(text)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/https?:\/\/[^\s<]*[^\s<.,;:!?)»"']/g, (url) => `<a class="faq-link" href="${url}" target="_blank" rel="noopener">${url.replace(/^https?:\/\//, '')}</a>`);
+}
+/** Відповідь з faq.json → HTML: абзаци через порожній рядок, списки — рядки, що починаються з «- ». */
+export function faqAnswer(src) {
+  const out = [];
+  for (const chunk of String(src || '').replace(/\r/g, '').split(/\n\s*\n/)) {
+    let para = [];
+    let list = null;
+    const flushPara = () => { if (para.length) { out.push(`<p>${para.map(faqInline).join('<br>')}</p>`); para = []; } };
+    const flushList = () => { if (list) { out.push(`<ul>${list.map((i) => `<li>${faqInline(i)}</li>`).join('')}</ul>`); list = null; } };
+    for (const line of chunk.split('\n')) {
+      const t = line.trim();
+      if (!t) continue;
+      const m = t.match(/^-\s+(.*)$/);
+      if (m) { flushPara(); (list ||= []).push(m[1]); } else { flushList(); para.push(t); }
+    }
+    flushPara();
+    flushList();
+  }
+  return raw(out.join(''));
+}
+/** Текст відповіді без розмітки — для JSON-LD (schema.org FAQPage). */
+const faqPlain = (src) => String(src || '').replace(/\r/g, '').replace(/\*\*(.+?)\*\*/g, '$1').trim();
+
+/** Лінія-хвиля під питанням (промальовується при відкритті): 40 півхвиль на ширину блоку. */
+const FAQ_WAVE = `M0 4${Array.from({ length: 40 }, (_, i) => (i ? ` T${(i + 1) * 10} 4` : ' Q5 0 10 4')).join('')}`;
+
+export function faqPage(faq) {
+  const data = faq && typeof faq === 'object' ? faq : {};
+  const title = String(data.title || 'Питання та відповіді');
+  const groups = (Array.isArray(data.groups) ? data.groups : [])
+    .map((g) => ({ ...g, items: (Array.isArray(g?.items) ? g.items : []).filter((it) => it && it.q) }))
+    .filter((g) => g.id && g.items.length);
+  const c = block('contacts');
+  const tg = telegramUrl();
+  let n = 0;
+  const toggleIcon = raw('<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="faq-icon-v" d="M12 5v14"/><path class="faq-icon-h" d="M5 12h14"/><path class="faq-icon-w" d="M3 12q2.25-4 4.5 0t4.5 0t4.5 0t4.5 0"/></svg>');
+
+  const ld = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: groups.flatMap((g) => g.items.map((it) => ({
+      '@type': 'Question',
+      name: String(it.q),
+      acceptedAnswer: { '@type': 'Answer', text: faqPlain(it.a) },
+    }))),
+  };
+
+  const body = html`
+  <section class="page-head container">
+    <h1 class="h1">${title}</h1>
+    ${data.lead ? html`<p class="page-lead">${data.lead}</p>` : ''}
+  </section>
+  ${groups.length ? html`
+  <!-- Ліворуч (на телефоні — ряд чіпсів угорі) групи; праворуч питання. Логіка — site.js (відкриття, хеш, підсвітка групи),
+       анімація відкриття — motion.js (wrMotion.faqAnim). Без JS працюють нативні details/summary. -->
+  <div class="container faq" data-faq>
+    <svg class="faq-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs><linearGradient id="faq-grad" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#FF2E9A"/><stop offset="1" stop-color="#00E5FF"/></linearGradient></defs></svg>
+    <nav class="faq-nav" aria-label="Групи питань" data-faq-nav>
+      <ol class="faq-nav-list" role="list">
+        ${groups.map((g, i) => html`<li><a class="faq-nav-link glass" href="#${g.id}" data-faq-link><span class="faq-nav-num" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span><span>${g.title}</span></a></li>`)}
+      </ol>
+    </nav>
+    <div class="faq-main">
+      ${groups.map((g) => html`
+      <section class="faq-group" id="${g.id}" aria-labelledby="faq-h-${g.id}" data-faq-group>
+        <h2 class="faq-group-title" id="faq-h-${g.id}">${g.title}</h2>
+        <div class="faq-list">
+          ${g.items.map((it) => {
+            n += 1;
+            return html`
+          <details class="faq-item glass glass-card" ${it.id ? raw(`id="${esc(it.id)}"`) : ''} name="faq-${g.id}" data-faq-item>
+            <summary class="faq-q"><span class="faq-num" aria-hidden="true">${String(n).padStart(2, '0')}</span><span class="faq-q-text">${it.q}</span>${toggleIcon}</summary>
+            <div class="faq-a">
+              <svg class="faq-wave" viewBox="0 0 400 8" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="${FAQ_WAVE}"/></svg>
+              <div class="faq-a-body">${faqAnswer(it.a)}</div>
+            </div>
+          </details>`;
+          })}
+        </div>
+      </section>`)}
+
+      <section class="faq-help glass glass-panel">
+        <h2 class="faq-help-title">Не знайшли відповіді?</h2>
+        <p class="muted">Напишіть нам у Telegram або одразу оберіть час для запису — підкажемо з будь-яким питанням.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-glass" href="${tg}" rel="noopener" data-cta="faq_telegram">${c.telegram ? 'Написати в Telegram' : 'Контакти'}${icon.arrowUp}</a>
+          ${btn('/book', 'Записатися', 'neon', icon.arrow, 'data-cta="faq_book"')}
+        </div>
+      </section>
+    </div>
+  </div>
+  <script type="application/ld+json">${raw(JSON.stringify(ld).replace(/</g, '\u003c'))}</script>` : html`
+  <section class="container"><div class="empty-state"><p>Питання й відповіді з'являться тут найближчим часом.</p></div></section>`}`;
+  return layout({ title, path: '/faq', description: String(data.lead || 'Відповіді на часті питання про запис, зведення, мастеринг і оплату у Wave Records.'), body, bodyClass: 'page-faq' });
 }
 
 /* ---------- Юридичні сторінки ---------- */

@@ -7,6 +7,7 @@
 // Локально: node --disable-warning=ExperimentalWarning static/build.js
 //   BASE_PATH=/wave-records  — якщо сайт відкривається з підпапки (username.github.io/wave-records)
 //   BASE_URL=https://...      — повна адреса сайту (для sitemap і посилань у соцмережах)
+// Питання та відповіді — content/faq.json (сторінка /faq/).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -149,6 +150,12 @@ async function main() {
   const contacts = readJson('contacts.json') || {};
   const services = readJson('services.json') || {};
   const texts = readJson('texts.json') || {};
+  const faq = readJson('faq.json');
+  if (faq) {
+    const { checkFaq } = await import('../src/faq.js');
+    const issues = checkFaq(faq);
+    if (issues.length) fail(`Помилка у файлі content/faq.json:\n${issues.map((m) => `     – ${m}`).join('\n')}`);
+  }
   if (problems.length) return;
 
   saveSettings({
@@ -210,6 +217,7 @@ async function main() {
     'about/index.html': views.aboutPage({ photos }),
     'book/index.html': views.staticBookPage({ booking }),
     'contacts/index.html': views.contactsPage(),
+    'faq/index.html': views.faqPage(faq),
     'privacy-policy/index.html': views.legalPage('legal.privacy', '/privacy-policy'),
     'agreement/index.html': views.legalPage('legal.agreement', '/agreement'),
     '404.html': views.notFoundPage(),
@@ -244,7 +252,7 @@ async function main() {
   fs.copyFileSync(path.join(ROOT, 'public/img/favicon.ico'), path.join(OUT, 'favicon.ico'));
   fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 
-  const urls = ['/', '/services/', '/portfolio/', '/about/', '/book/', '/contacts/', '/privacy-policy/', '/agreement/'];
+  const urls = ['/', '/services/', '/portfolio/', '/about/', '/book/', '/contacts/', '/faq/', '/privacy-policy/', '/agreement/'];
   if (BASE_URL) {
     fs.writeFileSync(path.join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${BASE_URL}${u}</loc></url>`).join('\n')}\n</urlset>\n`);
   }

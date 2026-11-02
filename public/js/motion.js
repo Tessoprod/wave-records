@@ -19,11 +19,11 @@ const wide = matchMedia('(min-width: 861px)').matches;
 
 const EASE = 'expo.out';
 const SOFT = 'power3.out';
-const motion = window.wrMotion = { gsap, ScrollTrigger, SplitText, lenis: null, reduceMotion, hero: null, heroReady: null, introDone: Promise.resolve(), stepMood: null, ready: false };
-// Сторінку відкрито через View Transition: заголовок уже перетік на місце, повторно його не анімуємо.
-// Клас vt-in ставить обробник pagereveal у <head>; motion.js може запуститися раніше за цю подію,
-// тому рішення приймаємо лише після window.wrRevealed (інакше заголовок мигне: фінальний → прихований → анімація).
-const cameByTransition = () => root.classList.contains('vt-in');
+const motion = window.wrMotion = {
+  gsap, ScrollTrigger, SplitText, lenis: null, reduceMotion, hero: null, heroReady: null,
+  introDone: Promise.resolve(), entered: Promise.resolve(), contentStarted: false, stepMood: null, ready: false,
+};
+// pagereveal (з <head>) каже, чи прийшли через View Transition; motion.js може запуститися раніше за нього
 const revealed = window.wrRevealed || Promise.resolve();
 const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
 
@@ -83,28 +83,48 @@ function cascade(items, { y = 40, x = 0, stagger = 0.08, onEnter } = {}) {
   });
 }
 
-/* ---------- 1. Заголовки й тексти ---------- */
+/* ---------- 1. Заголовки й тексти ----------
+   pageTitle() — назва сторінки (перший h1), стартує першою; headings() — решта заголовків і лідів. */
+const titleEl = () => document.querySelector('main h1.h1');
+function splitLines(el, trigger = true) {
+  gsap.set(el, { opacity: 1 });
+  // Рядки виїжджають знизу з маски; після анімації розмітка повертається до звичайної
+  const split = SplitText.create(el, { type: 'lines', mask: 'lines' });
+  gsap.from(split.lines, {
+    yPercent: 105, duration: 1, ease: EASE, stagger: 0.08,
+    scrollTrigger: trigger ? onceAt(el, 'top 92%') : undefined,
+    onComplete: () => split.revert(),
+  });
+}
+function pageTitle() {
+  const el = titleEl();
+  if (!el) return;
+  if (!SplitText) gsap.to(el, { opacity: 1, duration: 0.8, ease: SOFT });
+  else splitLines(el, false);
+}
 function headings() {
-  $$('main .h1, main .h2').filter(notInDialog).filter((el) => !(el.tagName === 'H1' && cameByTransition()))
+  $$('main .h1, main .h2').filter(notInDialog).filter((el) => el !== titleEl())
     .filter((el) => !(motion.stage && el.closest('.svc-section'))).forEach((el) => {
-    if (reduceMotion || !SplitText) {
+    if (!SplitText) {
       gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: SOFT, scrollTrigger: onceAt(el, 'top 92%') });
       return;
     }
-    gsap.set(el, { opacity: 1 });
-    // Рядки виїжджають знизу з маски; після анімації розмітка повертається до звичайної
-    const split = SplitText.create(el, { type: 'lines', mask: 'lines' });
-    gsap.from(split.lines, {
-      yPercent: 105, duration: 1, ease: EASE, stagger: 0.08,
-      scrollTrigger: onceAt(el, 'top 92%'),
-      onComplete: () => split.revert(),
-    });
+    splitLines(el);
   });
   $$('main .page-lead, main .sec-lead, main .sec-sub, main .chapter').filter(notInDialog).forEach((el) => {
-    gsap.fromTo(el, { opacity: 0, y: reduceMotion ? 0 : 18 }, {
+    gsap.fromTo(el, { opacity: 0, y: 18 }, {
       opacity: 1, y: 0, duration: 0.9, ease: SOFT, delay: 0.1, clearProps: 'transform',
       scrollTrigger: onceAt(el, 'top 94%'),
     });
+  });
+}
+// Вміст без власної анімації (текст юридичних сторінок, кнопки, фото, футер) — м'яке проявлення.
+// Прозорість лишається вбудованою (opacity: 1): інакше знову спрацює приховане правило з site.css
+const PLAIN = 'main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn, .section-steps .steps, .steps-cta, .marquee, .book-help, .faq-nav, .faq-group-title, .faq-help, .site-footer';
+function plainFade() {
+  // Блок Послуг на головній (сцена з закріпленням) проявляє сама сцена — тут його не чіпаємо
+  $$(PLAIN).filter((el) => !(motion.stage && el.closest('.svc-section'))).forEach((el) => {
+    gsap.fromTo(el, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.8, ease: SOFT, clearProps: 'transform', scrollTrigger: onceAt(el, 'top 96%') });
   });
 }
 
@@ -208,6 +228,7 @@ function servicesStage() {
 function blocks() {
   const groups = motion.stage ? '.svc-full-grid, .phil-grid, .bento, .book-info, .gallery, .chips' : '.svc-grid, .svc-full-grid, .phil-grid, .bento, .book-info, .gallery, .chips';
   cascade($$(`:is(${groups}) > *`));
+  cascade($$('.faq-list > .faq-item'), { y: 24, stagger: 0.06 });
   $$('.book-embed, .cta-band, .tl-text, .empty-state').forEach((el) => cascade([el], { y: 30 }));
 
   // Треки в'їжджають по черзі, хвиля промальовується зліва направо
@@ -283,11 +304,7 @@ function about() {
   }
   // Фото етапів відкриваються маскою, всередині рамки — легкий паралакс
   $$('.tl-media').forEach((media) => {
-    if (reduceMotion) {
-      gsap.set(media, { clipPath: 'none' });
-      gsap.from(media, { opacity: 0, duration: 0.8, scrollTrigger: onceAt(media) });
-      return;
-    }
+    if (reduceMotion) return; // без руху фото видно одразу
     gsap.to(media, { clipPath: 'inset(0% 0% 0% 0%)', duration: 1.2, ease: EASE, scrollTrigger: onceAt(media), onComplete: () => gsap.set(media, { clipPath: 'none' }) });
     const inner = media.firstElementChild;
     if (inner) gsap.fromTo(inner, { yPercent: -7, scale: 1.16 }, { yPercent: 7, scale: 1.16, ease: 'none', scrollTrigger: { trigger: media, start: 'top bottom', end: 'bottom top', scrub: true } });
@@ -395,7 +412,7 @@ function logoEq() {
       // Футер: смужки виростають, коли він уперше з'являється на екрані
       if (inFooter && en.isIntersecting && !l.appeared) { l.appeared = true; appear(l); }
     }).observe(l.logo);
-    if (!inFooter) motion.introDone.then(() => { l.appeared = true; appear(l); });
+    if (!inFooter) motion.entered.then(() => { l.appeared = true; appear(l); });
     if (finePointer) l.logo.addEventListener('mouseenter', () => wave(l));
     l.logo.addEventListener('focus', () => { if (l.logo.matches(':focus-visible')) wave(l); });
   });
@@ -424,6 +441,45 @@ function logoEq() {
 /* Меню-хвиля: темна SVG-форма з хвилястим краєм накриває екран згори донизу, сайт позаду розмивається,
    потім каскадом з'являються пункти; закриття — та сама хвиля назад угору.
    site.js викликає wrMotion.menuAnim(open) і чекає завершення (фокус, hidden). */
+/* Край хвилі (меню й шторка переходу): дві кубічні дуги; y — висота краю (у % екрана), a — амплітуда, ph — фаза */
+function waveDrawer(fill, edge, w) {
+  return () => {
+    const v = (k) => w.y + w.a * Math.sin(w.ph + k * 1.9);
+    const e = (k) => v(k).toFixed(2);
+    // Друга дуга починається з дзеркальної контрольної точки — стик посередині гладкий, без зламу
+    const mirror = (2 * v(3) - v(2)).toFixed(2);
+    const curve = `C83 ${e(1)} 67 ${e(2)} 50 ${e(3)} C33 ${mirror} 17 ${e(5)} 0 ${e(6)}`;
+    fill.setAttribute('d', `M0 0 L100 0 L100 ${e(0)} ${curve} Z`);
+    edge.setAttribute('d', `M100 ${e(0)} ${curve}`);
+  };
+}
+
+/* Шторка переходу з меню: на новій сторінці вона опущена з першого кадру (html.from-menu); коли готові
+   шрифти й перша відмальовка, піднімається тією самою хвилею, що й при закритті меню. */
+function curtainLift() {
+  const c = document.querySelector('[data-page-curtain]');
+  const finish = () => {
+    root.classList.remove('from-menu');
+    try { sessionStorage.removeItem('wr_from_menu'); } catch { /* приватний режим */ }
+  };
+  if (!c) { finish(); return Promise.resolve(); }
+  const fill = c.querySelector('.page-curtain-fill');
+  const edge = c.querySelector('.page-curtain-edge');
+  const w = { y: 112, a: 0, ph: 3.2 };
+  const draw = waveDrawer(fill, edge, w);
+  draw();
+  motion.lenis?.stop();
+  const firstPaint = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const fontsOrTimeout = Promise.race([fontsReady, new Promise((r) => setTimeout(r, 1500))]);
+  return fontsOrTimeout.then(firstPaint).then(() => new Promise((resolve) => {
+    gsap.set(edge, { opacity: 0.85 });
+    gsap.timeline({ onComplete: () => { finish(); motion.lenis?.start(); resolve(); } })
+      .to(w, { y: -14, ph: 0, duration: 0.75, ease: 'power3.inOut', onUpdate: draw }, 0)
+      .to(w, { a: 8, duration: 0.32, ease: 'sine.out' }, 0)
+      .to(w, { a: 0, duration: 0.4, ease: 'sine.in' }, 0.32);
+  }));
+}
+
 function menuWave() {
   const menu = document.querySelector('[data-menu]');
   if (!menu || reduceMotion) return;
@@ -434,17 +490,8 @@ function menuWave() {
   const foot = menu.querySelector('.menu-foot');
   if (!fill || !edge) return;
   menu.classList.add('is-animated');
-  // Край хвилі: дві кубічні дуги; y — висота краю (у % екрана), a — амплітуда, ph — фаза
   const w = { y: -14, a: 0, ph: 0 };
-  const draw = () => {
-    const v = (k) => w.y + w.a * Math.sin(w.ph + k * 1.9);
-    const e = (k) => v(k).toFixed(2);
-    // Друга дуга починається з дзеркальної контрольної точки — стик посередині гладкий, без зламу
-    const mirror = (2 * v(3) - v(2)).toFixed(2);
-    const curve = `C83 ${e(1)} 67 ${e(2)} 50 ${e(3)} C33 ${mirror} 17 ${e(5)} 0 ${e(6)}`;
-    fill.setAttribute('d', `M0 0 L100 0 L100 ${e(0)} ${curve} Z`);
-    edge.setAttribute('d', `M100 ${e(0)} ${curve}`);
-  };
+  const draw = waveDrawer(fill, edge, w);
   draw();
   let tl = null;
   motion.menuAnim = (open) => new Promise((resolve) => {
@@ -475,6 +522,38 @@ function menuWave() {
         .to(blur, { opacity: 0, duration: 0.45, ease: 'power2.in' }, 0.4)
         .call(resolve, null, 0.85);
     }
+  });
+}
+
+/* ---------- Питання та відповіді: розгортання відповіді ----------
+   site.js викликає wrMotion.faqAnim(details, open) і чекає завершення (true — дійшла до кінця,
+   false — перервана новим кліком). Відкриття: висота 0 → авто й проявлення (0,5 с), лінія-хвиля
+   промальовується зліва направо (маска clip-path); закриття — навпаки. */
+function faqAnim() {
+  if (!document.querySelector('[data-faq]') || reduceMotion) return;
+  const running = new WeakMap();
+  motion.faqAnim = (item, open) => new Promise((resolve) => {
+    const panel = item.querySelector('.faq-a');
+    const wave = item.querySelector('.faq-wave');
+    const body = item.querySelector('.faq-a-body');
+    if (!panel) { resolve(true); return; }
+    // Попередня анімація цього питання (клік посеред руху) зупиняється там, де була
+    const from = panel.style.height ? panel.offsetHeight : 0;
+    running.get(item)?.kill();
+    const end = (ok) => () => resolve(ok);
+    let tl;
+    if (open) {
+      tl = gsap.timeline({ onComplete: end(true), onInterrupt: end(false) })
+        .fromTo(panel, { height: from }, { height: 'auto', duration: 0.5, ease: 'power3.inOut', clearProps: 'height' }, 0)
+        .fromTo(body, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.45, ease: SOFT, clearProps: 'transform' }, 0.1)
+        .fromTo(wave, { clipPath: 'inset(-4px 100% -4px 0)' }, { clipPath: 'inset(-4px 0% -4px 0)', duration: 0.6, ease: 'power2.inOut' }, 0);
+    } else {
+      tl = gsap.timeline({ onComplete: () => { gsap.set([panel, body, wave], { clearProps: 'all' }); resolve(true); }, onInterrupt: end(false) })
+        .to(body, { opacity: 0, duration: 0.25, ease: 'power2.in' }, 0)
+        .to(wave, { clipPath: 'inset(-4px 100% -4px 0)', duration: 0.4, ease: 'power2.inOut' }, 0)
+        .fromTo(panel, { height: panel.offsetHeight }, { height: 0, duration: 0.45, ease: 'power3.inOut' }, 0.05);
+    }
+    running.set(item, tl);
   });
 }
 
@@ -584,30 +663,26 @@ function intro() {
   });
 }
 
-/* Поява першого екрана: текст і кнопки з'являються одразу після шрифтів (і інтро), не чекаючи 3D.
-   3D-сцена ініціалізується після першої відмальовки і плавно проявляється, коли вже відрендерила
-   кілька анімованих кадрів (без статичного кадру). Літери WAVE RECORDS виїжджають знизу, далі решта. */
+/* Поява першого екрана (його «назва сторінки»): викликає диригент після інтро чи шторки.
+   Текст і 3D-сцена проявляються разом, один раз; якщо сцена ще не готова — проявиться, щойно буде.
+   Літери WAVE RECORDS виїжджають знизу, далі решта. */
 function heroIntro() {
   const intro = document.querySelector('[data-hero-intro]');
   const host = document.querySelector('[data-hero-scene]');
   const revealScene = () => host?.classList.add('is-ready');
   if (!intro) { motion.heroReady?.then(revealScene); return; }
-  const show = () => intro.classList.add('is-in');
-  motion.heroReady?.then(revealScene);
+  const show = () => { intro.classList.add('is-in'); motion.heroReady?.then(revealScene); };
   if (!gsap || reduceMotion) { show(); return; }
   const line1 = intro.querySelector('.hero-l1');
   const rest = intro.querySelectorAll('.hero-l2, .hero-sub, .hero-ctas');
-  const run = () => {
+  {
     show();
-    if (cameByTransition()) return; // перехід уже показав перший екран
     const split = SplitText && line1 ? SplitText.create(line1, { type: 'chars', mask: 'chars' }) : null;
     const tl = gsap.timeline({ defaults: { ease: EASE }, onComplete: () => split?.revert() });
     if (split) tl.from(split.chars, { yPercent: 110, duration: 1.2, stagger: 0.035 });
     else if (line1) tl.from(line1, { y: 40, opacity: 0, duration: 1.1 });
     tl.from(rest, { y: 28, opacity: 0, duration: 1, stagger: 0.1 }, split ? 0.35 : 0.2);
-  };
-  // Літери ділимо після завантаження шрифтів (інакше їхня ширина буде хибною), після інтро і pagereveal
-  Promise.all([fontsReady, motion.introDone, revealed]).then(run);
+  }
 }
 
 /* 3D-скульптура (public/js/hero3d.js): на першому екрані, а на комп'ютері ще й у секції «Як це працює».
@@ -700,6 +775,7 @@ function homeLinks() {
   document.addEventListener('click', (e) => {
     const a = e.target.closest('a');
     if (!home(a) || a.pathname !== location.pathname || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+    if (a.closest('[data-menu]')) return; // пункт меню на поточну сторінку просто закриває меню (site.js)
     e.preventDefault();
     if (document.body.classList.contains('menu-open')) document.querySelector('[data-menu-toggle]')?.click();
     if (motion.lenis) motion.lenis.scrollTo(0, { duration: 1.2 });
@@ -718,8 +794,42 @@ function homeLinks() {
   addEventListener('focusin', warm);
 }
 
+/* ---------- Диригент завантаження ----------
+   Чітка послідовність, без таймерів:
+     1) перша відмальовка — стани з першого кадру задають класи з <head> (wr-anim, wr-intro, from-menu);
+     2) вхід — інтро (перше відвідування) | шторка з меню (from-menu) | View Transition (звичайне посилання) | нічого;
+     3) лише після повного завершення входу — назва сторінки (перший екран на головній);
+     4) за мить — решта контенту.
+   Запобіжник із <head> (wrArmFailsafe) починає відлік лише після входу: якщо поява не почалась за 3 с — усе видно. */
+async function entrance() {
+  await revealed;
+  if (root.classList.contains('wr-intro')) return motion.introDone;
+  if (root.classList.contains('from-menu')) return curtainLift();
+  const vt = window.wrViewTransition;
+  if (vt) { try { await vt.finished; } catch { /* перехід пропущено */ } }
+  return undefined;
+}
+async function conductor() {
+  await motion.entered;
+  window.wrArmFailsafe?.();
+  await fontsReady; // рядки ділимо лише за справжніми шрифтами
+  motion.contentStarted = true;
+  heroIntro();
+  pageTitle();
+  // Решта — слідом за назвою, щоб рух був шаруватим
+  await new Promise((r) => setTimeout(r, titleEl() ? 300 : 120));
+  try { headings(); } catch (err) { console.error(err); showAll(); }
+  steps();
+  blocks();
+  about();
+  plainFade();
+  ScrollTrigger.sort();
+  ScrollTrigger.refresh();
+}
+
 function showAll() {
-  root.classList.remove('wr-anim', 'wr-intro');
+  root.classList.remove('wr-anim', 'wr-intro', 'from-menu');
+  try { sessionStorage.removeItem('wr_from_menu'); } catch { /* приватний режим */ }
   document.querySelector('[data-intro]')?.remove();
 }
 try {
@@ -735,25 +845,26 @@ try {
     motion.heroReady = root.classList.contains('wr-intro') ? start() : afterFirstPaint().then(start);
   }
   motion.introDone = intro();
-  heroIntro();
+  motion.entered = reduceMotion ? Promise.resolve() : entrance();
   scrollHint();
+  // Сцена Послуг і згасання першого екрана лише задають стани, прив'язані до прокрутки (без появи)
   motion.stage = servicesStage();
   if (!motion.stage) heroFadeStandalone();
-  steps();
-  blocks();
-  about();
   marquees();
   magnets();
   menuWave();
+  faqAnim();
   logoEq();
-  // Заголовки ділимо на рядки після завантаження шрифтів і pagereveal (щоб знати, чи прийшли через перехід)
-  Promise.all([fontsReady, revealed]).then(() => {
-    try { headings(); } catch (err) { console.error(err); showAll(); }
-    ScrollTrigger.sort();
-    ScrollTrigger.refresh();
-  });
-  motion.introDone.then(() => ScrollTrigger.refresh());
   motion.ready = true;
+  if (reduceMotion) {
+    // Без руху: усе видно одразу, жодних появ
+    motion.contentStarted = true;
+    heroIntro();
+    steps();
+    about();
+  } else {
+    conductor().catch((err) => { console.error(err); showAll(); });
+  }
 } catch (err) {
   console.error('Анімації вимкнено:', err);
   showAll();

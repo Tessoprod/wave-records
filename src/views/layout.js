@@ -89,12 +89,23 @@ export function layout({ title, description, path: current = '/', body, bodyClas
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <!-- Перший скрипт сторінки, до будь-якого CSS: стартові приховані стани анімацій (site.css) діють з першого кадру.
-       js — сторінку обслуговує JavaScript; wr-anim — приховані стани анімацій;
-       wr-intro — інтро при першому вході в цій сесії (не з prefers-reduced-motion);
-       vt-in — сторінку відкрито через View Transition (ставить pagereveal; motion.js чекає window.wrRevealed);
-       якщо motion.js за 2,5 с не запустився, wr-anim і wr-intro знімаються і весь вміст видно без анімації. -->
-  <script>(function(d,w){d.classList.add('js','wr-anim');try{if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&!sessionStorage.getItem('wr_intro')){d.classList.add('wr-intro');sessionStorage.setItem('wr_intro','1')}}catch(e){}w.wrRevealed=new Promise(function(r){if(!('onpagereveal' in w))return r();w.addEventListener('pagereveal',function(e){if(e.viewTransition)d.classList.add('vt-in');r()},{once:true});setTimeout(r,1500)});setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.ready))d.classList.remove('wr-anim','wr-intro')},2500)})(document.documentElement,window)</script>
+  <!-- Перший скрипт сторінки, до будь-якого CSS: класи стану на <html>, тож CSS з першого кадру знає, що ховати.
+       js — є JavaScript; wr-anim — приховані стани анімацій (не з prefers-reduced-motion);
+       wr-intro — інтро при першому вході в сесії; from-menu — прийшли з меню (позначка wr_from_menu у sessionStorage):
+       шторка опущена з першого кадру. Порядок появи веде диригент у motion.js.
+       Запобіжники: якщо motion.js не запустився за 4 с — усе видно; після інтро чи шторки motion.js
+       викликає wrArmFailsafe(): якщо за 3 с поява не почалась — усе видно без анімації. -->
+  <script>(function(d,w){var s=null;try{s=w.sessionStorage}catch(e){}
+function get(k){try{return s&&s.getItem(k)}catch(e){return null}}function del(k){try{s&&s.removeItem(k)}catch(e){}}
+var still=matchMedia('(prefers-reduced-motion: reduce)').matches,fm=+get('wr_from_menu');d.classList.add('js');
+if(!still){d.classList.add('wr-anim');if(!get('wr_intro')){d.classList.add('wr-intro');try{s.setItem('wr_intro','1')}catch(e){}}else if(fm&&Date.now()-fm<15000)d.classList.add('from-menu')}
+if(!d.classList.contains('from-menu'))del('wr_from_menu');
+function quiet(v){function n(){}v.ready.catch(n);v.finished.catch(n);if(v.updateCallbackDone)v.updateCallbackDone.catch(n);return v}
+w.wrRevealed=new Promise(function(r){if(!('onpagereveal' in w))return r();w.addEventListener('pagereveal',function(e){var v=e.viewTransition&&quiet(e.viewTransition);if(v){if(d.classList.contains('from-menu'))v.skipTransition();else{d.classList.add('vt-in');w.wrViewTransition=v}}r()},{once:true});setTimeout(r,1500)});
+w.addEventListener('pageswap',function(e){var v=e.viewTransition&&quiet(e.viewTransition);if(v&&get('wr_from_menu'))v.skipTransition()});
+function reveal(){d.classList.remove('wr-anim','wr-intro','from-menu');d.classList.add('wr-failsafe');del('wr_from_menu')}
+setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.ready))reveal()},4000);
+w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.contentStarted))reveal()},3000)}})(document.documentElement,window)</script>
   <title>${fullTitle}</title>
   <meta name="description" content="${desc}">
   <meta name="theme-color" content="#111111">
@@ -117,6 +128,14 @@ export function layout({ title, description, path: current = '/', body, bodyClas
 </head>
 <body class="${bodyClass}">
   ${analyticsBody(s)}
+  <!-- Шторка переходу з меню: видно лише з html.from-menu (див. скрипт у <head>), піднімає її motion.js -->
+  <div class="page-curtain" data-page-curtain aria-hidden="true">
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" focusable="false">
+      <defs><linearGradient id="curtain-edge" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#FF2E9A"/><stop offset="1" stop-color="#00E5FF"/></linearGradient></defs>
+      <path class="page-curtain-fill" d="M0 0 L100 0 L100 112 L0 112 Z"/>
+      <path class="page-curtain-edge" d="M100 112 L0 112" stroke="url(#curtain-edge)" vector-effect="non-scaling-stroke"/>
+    </svg>
+  </div>
   <!-- Інтро: показується лише з html.wr-intro (див. скрипт у <head>), анімацію веде motion.js -->
   <div class="intro" data-intro>
     <div class="intro-half intro-top" aria-hidden="true"></div>
@@ -133,6 +152,8 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   </div>
   <a class="skip" href="#main">Перейти до вмісту</a>
   <div class="bg" data-bg aria-hidden="true"><div class="bg-dots"></div><canvas></canvas><div class="bg-grain"></div></div>
+  <!-- Рідина за курсором (public/js/fluid.js): над фоном і під вмістом; коли відкрите меню, fluid.js переносить її в меню -->
+  <canvas class="fluid" data-fluid aria-hidden="true"></canvas>
 
   <header class="site-header glass" data-header>
     <a class="logo" href="/" aria-label="${s.company} — на головну">${logoMark()}</a>
@@ -155,16 +176,12 @@ export function layout({ title, description, path: current = '/', body, bodyClas
     </svg>
     <nav class="menu-inner container" aria-label="Головне меню">
       <ol class="menu-links" role="list">${navLinks}</ol>
+      <!-- Низ меню — одна лінія: адреса — телефон — Telegram — «Записатися» (на телефоні — компактна група по центру) -->
       <div class="menu-foot">
-        <div class="menu-corner">
-          <p class="menu-contact">${c.city}, ${c.address}</p>
-          <p class="menu-contact">${c.schedule_days}, ${c.schedule_hours}</p>
-        </div>
-        <div class="menu-corner menu-corner-r">
-          <p class="menu-contact"><a href="${telLink(c.phone)}">${c.phone}</a></p>
-          ${c.telegram ? html`<p class="menu-contact"><a href="https://t.me/${c.telegram}" rel="noopener">Telegram @${c.telegram}</a></p>` : ''}
-          <a class="btn btn-neon menu-book" href="/book">Записатися${icon.arrow}</a>
-        </div>
+        <p class="menu-contact menu-addr">${c.address}</p>
+        <p class="menu-contact menu-phone"><a href="${telLink(c.phone)}">${c.phone}</a></p>
+        ${c.telegram ? html`<p class="menu-contact menu-tg"><a href="https://t.me/${c.telegram}" rel="noopener">Telegram @${c.telegram}</a></p>` : ''}
+        <a class="btn btn-neon menu-book" href="/book">Записатися${icon.arrow}</a>
       </div>
     </nav>
   </div>
@@ -198,7 +215,7 @@ export function layout({ title, description, path: current = '/', body, bodyClas
       </div>
       <div>
         <h2 class="footer-h">Сторінки</h2>
-        <ul class="footer-links">${NAV.slice(1).map(([href, label]) => html`<li><a href="${href}">${label}</a></li>`)}</ul>
+        <ul class="footer-links">${[...NAV.slice(1), ['/faq', 'FAQ']].map(([href, label]) => html`<li><a href="${href}">${label}</a></li>`)}</ul>
       </div>
     </div>
     <div class="container footer-bottom">
@@ -226,6 +243,7 @@ export function layout({ title, description, path: current = '/', body, bodyClas
   <div class="vt-curtain" aria-hidden="true"></div>
 
   <script src="${asset('js/bg.js')}" defer></script>
+  <script src="${asset('js/fluid.js')}" defer></script>
   <script src="${asset('js/site.js')}" defer></script>
   <!-- Анімації: бібліотеки з public/vendor (версія в назві файлу), ініціалізація — public/js/motion.js -->
   <script src="${asset('vendor/gsap-3.15.0.min.js')}" defer></script>

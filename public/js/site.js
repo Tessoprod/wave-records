@@ -46,7 +46,12 @@
   const storedConsent = storage.get('wr_consent');
   if (storedConsent === 'all') loadPixel();
   if (consentBox) {
-    if (!storedConsent) setTimeout(() => { consentBox.hidden = false; }, 900);
+    // Банер — лише після входу (інтро чи шторки з меню), щоб не з'являвся поверх них
+    if (!storedConsent) {
+      setTimeout(() => {
+        Promise.resolve(window.wrMotion?.entered).then(() => setTimeout(() => { consentBox.hidden = false; }, 400));
+      }, 500);
+    }
     consentBox.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-consent-choice]');
       if (!btn) return;
@@ -119,7 +124,35 @@
     }
   }
   toggle?.addEventListener('click', () => setMenu(!isOpen()));
-  menu?.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
+  /* Посилання в меню:
+       • на поточну сторінку — просто закрити меню;
+       • на іншу сторінку сайту — шторка лишається опущеною: ставимо позначку wr_from_menu і переходимо;
+         нова сторінка відкривається з опущеною шторкою і піднімає її (motion.js, curtainLift),
+         View Transition для такого переходу вимикає скрипт у <head>;
+       • решта (телефон, Telegram, нова вкладка) — як звичайно, меню закривається. */
+  const samePath = (a, b) => (a.replace(/\/+$/, '') || '/') === (b.replace(/\/+$/, '') || '/');
+  menu?.addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a) return;
+    const plain = !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0 && !a.target && !a.hasAttribute('download');
+    const internal = plain && a.origin === location.origin && /^https?:$/.test(a.protocol);
+    if (internal && samePath(a.pathname, location.pathname)) {
+      if (!a.hash) e.preventDefault();
+      setMenu(false);
+      return;
+    }
+    if (internal && !reduceMotion && window.wrMotion?.menuAnim) {
+      try { sessionStorage.setItem('wr_from_menu', String(Date.now())); } catch { setMenu(false); }
+      return; // шторку не піднімаємо — браузер переходить на нову сторінку
+    }
+    setMenu(false);
+  });
+  // Повернення кнопкою «Назад» на сторінку зі збереженого стану (bfcache), з якої пішли через меню:
+  // меню там ще відкрите — піднімаємо шторку, як при закритті
+  addEventListener('pageshow', (e) => {
+    try { sessionStorage.removeItem('wr_from_menu'); } catch { /* приватний режим */ }
+    if (e.persisted && isOpen()) setMenu(false);
+  });
   document.addEventListener('keydown', (e) => {
     if (!isOpen()) return;
     if (e.key === 'Escape') { setMenu(false); toggle.focus(); return; }
@@ -453,6 +486,122 @@
       audio.removeAttribute('src');
       audio.load();
     });
+  }
+
+  /* ---------- Питання та відповіді (/faq) ----------
+     Основа — нативні details/summary: без JS усе відкривається й закривається саме.
+     Тут: у межах групи відкрите одне питання; aria-expanded на summary; хеш в URL (#installments)
+     відкриває й прокручує до питання, а відкриття оновлює хеш без стрибка (history.replaceState);
+     підсвітка поточної групи в колонці ліворуч (на телефоні — у ряді чіпсів).
+     Плавне розгортання дає motion.js (wrMotion.faqAnim); без нього — миттєво. */
+  const faq = $('[data-faq]');
+  if (faq) {
+    const items = $$('[data-faq-item]', faq);
+    const shown = (d) => d.open && !d.classList.contains('is-closing');
+    const sync = (d) => $('summary', d).setAttribute('aria-expanded', String(shown(d)));
+    const setHash = (id) => {
+      const url = id ? `#${id}` : location.pathname + location.search;
+      try { history.replaceState(history.state, '', url); } catch { /* file:// тощо */ }
+    };
+    // Ексклюзивність робимо самі (з анімацією закриття сусіда), тож нативне name="" прибираємо
+    items.forEach((d) => { d.removeAttribute('name'); sync(d); });
+
+    async function setItem(d, open, { animate = true, hash = true } = {}) {
+      if (open === shown(d)) return;
+      const anim = animate && !reduceMotion ? window.wrMotion?.faqAnim : null;
+      if (open) {
+        $$('[data-faq-item]', d.closest('[data-faq-group]') || faq).forEach((o) => { if (o !== d && shown(o)) setItem(o, false, { animate, hash: false }); });
+        d.classList.remove('is-closing');
+        d.open = true;
+        sync(d);
+        if (hash && d.id) setHash(d.id);
+        if (anim) await anim(d, true);
+      } else {
+        d.classList.add('is-closing');
+        sync(d);
+        if (hash && d.id && location.hash === `#${d.id}`) setHash('');
+        if (anim) {
+          const done = await anim(d, false);
+          if (!done || !d.classList.contains('is-closing')) return; // поки закривалось, питання відкрили знову
+        }
+        d.classList.remove('is-closing');
+        d.open = false;
+        sync(d);
+      }
+    }
+
+    items.forEach((d) => {
+      $('summary', d).addEventListener('click', (e) => {
+        e.preventDefault();
+        setItem(d, !shown(d));
+      });
+      // Браузер може відкрити details сам (пошук на сторінці) — тримаємо стан і сусідів у порядку
+      d.addEventListener('toggle', () => {
+        if (d.open && !d.classList.contains('is-closing')) {
+          $$('[data-faq-item]', d.closest('[data-faq-group]') || faq).forEach((o) => { if (o !== d && o.open && !o.classList.contains('is-closing')) { o.open = false; sync(o); } });
+        }
+        sync(d);
+      });
+    });
+
+    // Хеш → відкрити питання і прокрутити до нього
+    const byHash = (hash) => {
+      let id = '';
+      try { id = decodeURIComponent(String(hash || '').slice(1)); } catch { return null; }
+      const el = id && document.getElementById(id);
+      return el && el.matches('[data-faq-item]') ? el : null;
+    };
+    const openFromHash = (smooth) => {
+      const d = byHash(location.hash);
+      if (!d) return;
+      setItem(d, true, { animate: smooth, hash: false });
+      requestAnimationFrame(() => {
+        const lenis = window.wrMotion?.lenis;
+        if (smooth && lenis) lenis.scrollTo(d);
+        else d.scrollIntoView({ block: 'start', behavior: smooth && !reduceMotion ? 'smooth' : 'instant' });
+      });
+    };
+    openFromHash(false);
+    addEventListener('hashchange', () => openFromHash(true));
+    // Посилання на питання на цій самій сторінці: відкриваємо (прокрутку робить motion.js або браузер)
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('a[href*="#"]');
+      if (!a || a.pathname !== location.pathname) return;
+      const d = byHash(a.hash);
+      if (d) setItem(d, true, { hash: false });
+    });
+
+    const links = $$('[data-faq-link]', faq);
+    const navRow = $('.faq-nav-list', faq);
+    const groups = $$('[data-faq-group]', faq);
+    let active = null;
+    const setActive = (id) => {
+      if (id === active) return;
+      active = id;
+      links.forEach((a) => {
+        const on = a.hash === `#${id}`;
+        a.classList.toggle('is-active', on);
+        if (on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+        // Ряд чіпсів на телефоні гортається вбік так, щоб активний чіпс було видно
+        if (on && navRow && navRow.scrollWidth > navRow.clientWidth + 1) {
+          navRow.scrollTo({ left: a.offsetLeft - (navRow.clientWidth - a.offsetWidth) / 2, behavior: reduceMotion ? 'auto' : 'smooth' });
+        }
+      });
+    };
+    // Поточна — остання група, чий верх уже вище лінії на 35 % висоти екрана (угорі сторінки — перша)
+    if (groups.length) {
+      let ticking = false;
+      const update = () => {
+        ticking = false;
+        const line = innerHeight * 0.35;
+        let cur = groups[0];
+        for (const g of groups) if (g.getBoundingClientRect().top <= line) cur = g;
+        setActive(cur.id);
+      };
+      addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+      addEventListener('resize', update, { passive: true });
+      update();
+    }
   }
 
   /* ---------- Галерея ---------- */

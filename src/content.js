@@ -17,7 +17,7 @@ export const BLOCKS = [
     ],
     defaults: {
       line1: 'WAVE RECORDS',
-      line2: 'Від ідеї до релізу.',
+      line2: 'Від ідеї до релізу',
       subtitle: 'Запис, продакшн, зведення та мастеринг у Wave Records.',
       cta_book: 'Записатися',
       cta_listen: 'Послухати роботи',

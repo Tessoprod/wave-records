@@ -7,6 +7,7 @@ import { trackPageview, trackEvent } from '../stats.js';
 import { bookableServices, getService, availability, monthAvailability, reserve } from '../booking.js';
 import * as gcal from '../gcal.js';
 import { block } from '../content.js';
+import { loadFaq } from '../faq.js';
 import { fmt, dateKey, isValidDateStr } from '../time.js';
 import { currentSession } from '../auth.js';
 import { notifyNewBooking } from '../notify.js';
@@ -46,6 +47,7 @@ export function registerSite(r) {
   r.get('/book', page((req) => views.bookPage({ services: bookableServices(), preselect: String(req.query.service || '') })));
 
   r.get('/contacts', page(() => views.contactsPage()));
+  r.get('/faq', page(() => views.faqPage(loadFaq())));
   r.get('/privacy-policy', page(() => views.legalPage('legal.privacy', '/privacy-policy')));
   r.get('/agreement', page(() => views.legalPage('legal.agreement', '/agreement')));
 
@@ -55,7 +57,7 @@ export function registerSite(r) {
   });
   r.get('/sitemap.xml', (req, res) => {
     const base = config.publicUrl || `http://${req.headers.host}`;
-    const urls = ['/', '/services', '/portfolio', '/about', '/book', '/contacts', '/privacy-policy', '/agreement'];
+    const urls = ['/', '/services', '/portfolio', '/about', '/book', '/contacts', '/faq', '/privacy-policy', '/agreement'];
     send(req, res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((u) => `<url><loc>${base}${u}</loc></url>`).join('')}</urlset>`, 'application/xml; charset=utf-8');
   });
 

@@ -140,6 +140,12 @@ h1, h2, h3, h4 { margin: 0; }
 }
 /* Зерно, щоб фон не був пласким (картинку генерує bg.js один раз, без мерехтіння) */
 .bg-grain { position: absolute; inset: 0; opacity: .045; background-size: 140px 140px; mix-blend-mode: overlay; }
+/* Рідина за курсором (fluid.js): один canvas у зниженій роздільності, розтягнутий на весь екран.
+   Шар — одразу над .bg і під усім вмістом (перший екран головної теж над нею: тло 3D-сцени прозоре).
+   Коли меню відкрите, fluid.js переносить canvas у меню (.is-in-menu): над шторкою-хвилею, під пунктами. */
+.fluid { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; display: block; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease); }
+.fluid.is-ready { opacity: 1; }
+.fluid.is-in-menu { z-index: 0; }
 
 /* ---------- Liquid glass ----------
    .glass — спільний клас скла (.btn-glass — його варіант для кнопок).
@@ -205,13 +211,13 @@ html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn
 
 /* Розмиття сусідів: коли курсор над карткою групи, інші картки цієї групи трохи розмиваються й притухають,
    а та, що під курсором, збільшується (як і раніше). Те саме при фокусі з клавіатури.
-   Групи: послуги (головна й сторінка Послуги), Контакти, інформаційні картки Запису, принципи на Про студію, треки.
+   Групи: послуги (головна й сторінка Послуги), Контакти, інформаційні картки Запису, принципи на Про студію, треки, питання FAQ.
    opacity з !important — після появи на скролі motion.js лишає вбудоване opacity: 1. */
-:is(.svc-grid, .svc-full-grid, .bento, .book-info, .phil-grid, .tracks) > * { transition: filter .3s var(--ease), opacity .3s var(--ease), transform .38s var(--ease-spring), box-shadow .38s var(--ease); }
+:is(.svc-grid, .svc-full-grid, .bento, .book-info, .phil-grid, .tracks, .faq-list) > * { transition: filter .3s var(--ease), opacity .3s var(--ease), transform .38s var(--ease-spring), box-shadow .38s var(--ease); }
 @media (hover: hover) and (pointer: fine) {
-  :is(.svc-grid, .svc-full-grid, .bento, .book-info, .phil-grid, .tracks):has(> :hover) > :not(:hover) { filter: blur(2.5px); opacity: .5 !important; }
+  :is(.svc-grid, .svc-full-grid, .bento, .book-info, .phil-grid, .tracks, .faq-list):has(> :hover) > :not(:hover) { filter: blur(2.5px); opacity: .5 !important; }
 }
-:is(.svc-grid, .svc-full-grid, .bento, .book-info, .phil-grid, .tracks):has(:focus-visible) > :not(:focus-within) { filter: blur(2.5px); opacity: .5 !important; }
+:is(.svc-grid, .svc-full-grid, .bento, .book-info, .phil-grid, .tracks, .faq-list):has(:focus-visible) > :not(:focus-within) { filter: blur(2.5px); opacity: .5 !important; }
 
 /* ---------- Кнопки ---------- */
 
@@ -412,23 +418,35 @@ html.eq-on :is(.site-header, .site-footer) .logo-bars { opacity: 1; }
 /* Активна сторінка — неонова точка після назви */
 .menu-links a[aria-current="page"] .menu-text::after { content: ''; width: .14em; height: .14em; min-width: 8px; min-height: 8px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 18px rgba(var(--pink-rgb), .35); }
 
-/* Нижні кути */
-.menu-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 32px; color: var(--ink-2); font-size: 16px; }
-.menu-corner { display: flex; flex-direction: column; gap: 2px; }
-.menu-corner-r { align-items: flex-end; text-align: right; }
-.menu-contact { margin: 0; }
+/* Низ меню — одна лінія на всю ширину: адреса — телефон — Telegram — «Записатися».
+   Крайні елементи по краях, проміжки однакові (space-between), спільна базова лінія.
+   Симетрія відносно центральної лінії: суми ширин пар «адреса + телефон» і «Telegram + кнопка» майже рівні
+   (адреса без міста — місто є у футері й на сторінці контактів). */
+.menu-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; color: var(--ink-2); font-size: 16px; }
+.menu-contact { margin: 0; white-space: nowrap; }
 .menu-contact a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; transition: color .25s; }
 .menu-contact a:hover { color: var(--white); }
-.menu-book { margin-top: 10px; }
+.menu-book { flex: none; }
 
 /* Поки меню відкрите, шапка — лише логотип і «Закрити» в кутах, без скляної підкладки */
-body.menu-open .site-header.glass { background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-body.menu-open .site-header.glass::before, body.menu-open .site-header.glass::after { opacity: 0; }
-body.menu-open .header-book { opacity: 0; visibility: hidden; transition: opacity .2s, visibility 0s .2s; }
+body.menu-open .site-header.glass, html.from-menu .site-header.glass { background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+body.menu-open .site-header.glass::before, body.menu-open .site-header.glass::after,
+html.from-menu .site-header.glass::before, html.from-menu .site-header.glass::after { opacity: 0; }
+body.menu-open .header-book, html.from-menu .header-book { opacity: 0; visibility: hidden; transition: opacity .2s, visibility 0s .2s; }
 
 /* Планшет: та сама сітка, пункти менші */
 @media (max-width: 1100px) {
   .menu-links a { font-size: clamp(32px, 5.4vw, 56px); }
+}
+/* Вузький екран: низ меню — компактна симетрична група по центру:
+   адреса, під нею телефон і Telegram в один рядок (обабіч центральної лінії), під ними кнопка на всю ширину */
+@media (max-width: 860px) {
+  .menu-foot { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; row-gap: 0; align-items: baseline; font-size: 15px; text-align: center; }
+  .menu-addr { grid-column: 1 / -1; margin-bottom: 2px; white-space: normal; }
+  .menu-phone { justify-self: end; }
+  .menu-tg { justify-self: start; }
+  .menu-foot:not(:has(.menu-tg)) .menu-phone { grid-column: 1 / -1; justify-self: center; }
+  .menu-book { grid-column: 1 / -1; width: 100%; margin-top: 8px; }
 }
 /* Телефон: одна колонка по центру, рівномірно на всю висоту; службові елементи компактно знизу */
 @media (max-width: 640px) {
@@ -436,10 +454,6 @@ body.menu-open .header-book { opacity: 0; visibility: hidden; transition: opacit
   .menu-links::before { display: none; }
   .menu-links li:nth-child(n) { justify-self: center; text-align: center; }
   .menu-links li:nth-child(n) a { align-items: center; --shift: 0px; font-size: clamp(30px, 9vw, 44px); gap: 6px; padding-bottom: 10px; }
-  .menu-foot { flex-direction: column; align-items: stretch; gap: 4px; font-size: 15px; }
-  .menu-corner, .menu-corner-r { align-items: center; text-align: center; }
-  .menu-corner-r { flex-direction: row; flex-wrap: wrap; justify-content: center; column-gap: 20px; }
-  .menu-book { width: 100%; margin-top: 8px; }
 }
 body.menu-open { overflow: hidden; }
 
@@ -476,13 +490,15 @@ main { display: block; }
 .hero-scene::before { content: ''; position: absolute; inset: 0; background: url('../img/hero-fallback.webp') center / cover no-repeat; }
 .hero-scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1s var(--ease); }
 .hero-scene.is-ready canvas { opacity: 1; }
-html.js .hero-scene:not(.is-ready) { background: var(--black); }
-html.js .hero-scene::before { opacity: 0; transition: opacity 1s var(--ease); animation: hero-failsafe .6s 2.5s forwards; }
-html.js .hero-scene.is-ready::before { animation: none; }
-html.js .hero-scene.is-fallback.is-ready::before { opacity: 1; }
-/* Поява заголовка: motion.js анімує його й ставить .is-in; якщо скрипт не спрацював — текст однаково з'являється */
-html.js [data-hero-intro]:not(.is-in) { opacity: 0; animation: hero-failsafe .6s 2.5s forwards; }
-@keyframes hero-failsafe { to { opacity: 1; } }
+/* Сцена готова — тло прозоре: під склом видно фон сторінки й рідину за курсором */
+.hero-scene.is-ready:not(.is-fallback) { background: none; }
+/* Стани до появи — лише під html.wr-anim (ставить скрипт у <head>, без prefers-reduced-motion).
+   Жодних CSS-таймерів: текст і сцену показує диригент у motion.js після інтро чи шторки; якщо скрипт
+   не спрацював, запобіжник у <head> знімає wr-anim — і все видно. */
+html.wr-anim .hero-scene:not(.is-ready) { background: var(--black); }
+html.wr-anim .hero-scene::before { opacity: 0; transition: opacity 1s var(--ease); }
+html.wr-anim .hero-scene.is-fallback.is-ready::before { opacity: 1; }
+html.wr-anim [data-hero-intro]:not(.is-in) { opacity: 0; }
 .hero-inner { position: relative; z-index: 1; padding-bottom: clamp(32px, 5vw, 56px); display: flex; flex-direction: column; align-items: center; text-align: center; }
 /* Текст поверх скла: м'яка темна тінь, щоб читався на будь-якому відблиску */
 .hero-title, .hero-sub { text-shadow: 0 2px 30px rgba(17, 17, 17, .6), 0 1px 3px rgba(17, 17, 17, .35); }
@@ -512,7 +528,7 @@ html.js [data-hero-intro]:not(.is-in) { opacity: 0; animation: hero-failsafe .6s
   animation: scroll-dot 2.2s cubic-bezier(.65, 0, .35, 1) infinite;
 }
 @keyframes scroll-dot { 0% { transform: translateY(-14px); opacity: 0; } 25%, 75% { opacity: 1; } 100% { transform: translateY(46px); opacity: 0; } }
-html.js [data-hero-intro]:not(.is-in) ~ .scroll-hint { opacity: 0; }
+html.wr-anim [data-hero-intro]:not(.is-in) ~ .scroll-hint { opacity: 0; }
 html.js [data-hero-intro].is-in ~ .scroll-hint { transition-delay: .9s, 0s; }
 [data-hero-intro] ~ .scroll-hint.is-hidden { opacity: 0; pointer-events: none; transition-delay: 0s; }
 .hero-bottom { display: flex; flex-direction: column; align-items: center; gap: 28px; margin-top: clamp(28px, 4vw, 48px); }
@@ -884,8 +900,11 @@ body:has(.mini-player:not([hidden])) .site-footer { padding-bottom: calc(110px +
    Список тут має збігатися з тим, що проявляє motion.js. */
 
 html.wr-anim main :is(.h1, .h2, .page-lead, .sec-lead, .sec-sub, .chapter):not(dialog *),
-html.wr-anim :is(.svc-grid, .svc-full-grid, .phil-grid, .why-grid, .bento, .book-info, .gallery, .tracks, .chips) > *,
+html.wr-anim :is(.svc-grid, .svc-full-grid, .phil-grid, .why-grid, .bento, .book-info, .gallery, .tracks, .chips, .faq-list) > *,
 html.wr-anim :is(.book-embed, .cta-band, .tl-text, .empty-state) { opacity: 0; }
+/* Решта вмісту без власної анімації — проявляється слідом за назвою сторінки (plainFade у motion.js) */
+html.wr-anim :is(main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn,
+  .section-steps .steps, .steps-cta, .marquee, .book-help, .faq-nav, .faq-group-title, .faq-help, .site-footer) { opacity: 0; }
 html.wr-anim .tl-media { clip-path: inset(100% 0 0 0); }
 html.wr-anim .steps { --steps-p: 0; }
 html.wr-anim .timeline { --tl-p: 0; }
@@ -944,6 +963,14 @@ button:not(:disabled), [role="button"], summary, label[for], select { cursor: po
 /* ---------- Інтро при першому вході (анімацію веде motion.js) ----------
    Видно лише з html.wr-intro: клас ставить скрипт у <head> раз на сесію і не ставить при prefers-reduced-motion.
    Без JS інтро немає. Якщо motion.js не підхопив інтро, воно саме зникає через 3,2 с. */
+/* Шторка переходу з меню: на новій сторінці з першого кадру опущена на весь екран (html.from-menu),
+   motion.js піднімає її тією самою хвилею, що й при закритті меню, і знімає клас. */
+.page-curtain { display: none; }
+html.from-menu .page-curtain { display: block; position: fixed; inset: 0; z-index: 45; }
+.page-curtain svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.page-curtain-fill { fill: var(--black); }
+.page-curtain-edge { fill: none; stroke-width: 2; opacity: 0; }
+
 .intro { display: none; }
 html.wr-intro .intro {
   display: block; position: fixed; inset: 0; z-index: 200; cursor: pointer;
@@ -978,7 +1005,6 @@ html.wr-intro .intro {
    і на власному домені — переходи в межах одного сайту. */
 @view-transition { navigation: auto; }
 .site-header { view-transition-name: site-header; }
-main h1 { view-transition-name: page-title; }
 .vt-curtain { position: fixed; inset: 0; z-index: -2; pointer-events: none; opacity: 0; view-transition-name: vt-curtain; }
 
 ::view-transition-group(root) { animation-duration: .8s; }
@@ -993,7 +1019,6 @@ main h1 { view-transition-name: page-title; }
 ::view-transition-new(site-header) { animation: none; }
 
 /* Заголовок перетікає зі старого місця в нове */
-::view-transition-group(page-title) { animation-duration: .7s; animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
 
 /* Неонова шторка: рожево-ціанова смуга проходить знизу вгору */
 /* Знімок самого елемента порожній — смугу малює фон групи переходу */
@@ -1006,8 +1031,6 @@ main h1 { view-transition-name: page-title; }
 ::view-transition-old(vt-curtain), ::view-transition-new(vt-curtain) { display: none; }
 @keyframes vt-curtain { from { transform: translateY(100%); } to { transform: translateY(-100%); } }
 
-/* Прийшли через перехід — заголовок уже на місці, повторна поява не потрібна */
-html.vt-in main h1, html.vt-in [data-hero-intro] { opacity: 1 !important; animation: none; }
 
 /* Без руху — лише коротке проявлення */
 @media (prefers-reduced-motion: reduce) {
@@ -1080,6 +1103,115 @@ html.vt-in main h1, html.vt-in [data-hero-intro] { opacity: 1 !important; animat
   .cta-band .btn { width: 100%; }
   .logo-img { height: 30px; }
   .logo-lg .logo-img { height: 52px; }
+}
+
+/* ---------- Питання та відповіді (/faq) ----------
+   Десктоп: ліворуч закріплена колонка груп (поточна — з неоновою позначкою, підсвічує site.js),
+   праворуч питання групами. Телефон: ряд скляних чіпсів угорі, що лишається під шапкою.
+   Питання — скляний рядок (details/summary): дрібний неоновий номер, текст, праворуч «+»,
+   який у відкритому стані стає хвилястою лінією. Відкриття анімує motion.js (wrMotion.faqAnim). */
+.faq { display: grid; grid-template-columns: minmax(200px, 270px) minmax(0, 1fr); gap: clamp(32px, 5vw, 88px); align-items: start; margin-top: clamp(44px, 6vw, 80px); }
+.faq-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.faq-nav { position: sticky; top: calc(var(--header-h) + 32px); z-index: 2; }
+.faq-nav-list { list-style: none; margin: 0; padding: 0 0 0 22px; display: flex; flex-direction: column; gap: 2px; position: relative; }
+/* Тонка напрямна лінія, уздовж якої стоїть неонова позначка поточної групи */
+.faq-nav-list::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 1px; background: linear-gradient(transparent, var(--line-2) 15%, var(--line-2) 85%, transparent); }
+/* На десктопі пункти — прості рядки, без скляної підкладки (клас .glass потрібен чіпсам на телефоні) */
+.faq-nav-link.glass { background: none; border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; overflow: visible; isolation: auto; }
+.faq-nav-link.glass::before { display: none; }
+.faq-nav-link {
+  position: relative; display: flex; align-items: baseline; gap: 12px; min-height: 44px; padding: 11px 0;
+  color: var(--ink-3); font-weight: 600; font-size: 16px; line-height: 1.3; text-decoration: none;
+  transition: color .3s var(--ease), transform .35s var(--ease);
+}
+.faq-nav-num { font-size: 11px; letter-spacing: .14em; color: var(--ink-3); transition: color .3s; }
+/* Неонова позначка: коротка риска на напрямній лінії зі світінням (замінює відблиск скла ::after) */
+.faq-nav-link.glass::after {
+  content: ''; position: absolute; inset: auto; left: -22px; top: 50%; width: 2px; height: 22px; margin-top: -11px; border-radius: 2px;
+  background: var(--pink); box-shadow: 0 0 14px rgba(var(--pink-rgb), .35); padding: 0; border: 0;
+  -webkit-mask: none; mask: none;
+  opacity: 0; transform: scaleY(.3); transition: opacity .3s var(--ease), transform .4s var(--ease);
+}
+.faq-nav-link.is-active { color: var(--white); }
+.faq-nav-link.is-active .faq-nav-num { color: var(--pink); }
+.faq-nav-link.glass.is-active::after { opacity: 1; transform: none; }
+@media (hover: hover) and (pointer: fine) {
+  .faq-nav-link:hover { color: var(--white); transform: translateX(4px); }
+}
+
+.faq-main { min-width: 0; }
+.faq-group + .faq-group { margin-top: clamp(48px, 6vw, 80px); }
+.faq-group-title { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(22px, 2.2vw, 30px); line-height: 1.1; margin: 0 0 22px; }
+.faq-list { display: flex; flex-direction: column; gap: 12px; }
+.faq-item.glass-card { padding: 0; border-radius: var(--r-lg); }
+/* Нахил довгого рядка до курсора — м'якший, ніж у карток */
+@media (hover: hover) and (pointer: fine) {
+  .faq-item.glass-card:hover { transform: perspective(1600px) rotateX(calc(var(--rx, 0deg) * .4)) rotateY(calc(var(--ry, 0deg) * .2)) scale(1.008); }
+}
+.faq-q {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px;
+  min-height: 72px; padding: 18px 22px 18px 24px; cursor: pointer; list-style: none;
+  border-radius: inherit;
+}
+.faq-q::-webkit-details-marker { display: none; }
+.faq-q::marker { content: ''; }
+.faq-q:focus-visible { outline-offset: -4px; }
+.faq-num { font-size: 12px; font-weight: 600; letter-spacing: .14em; color: var(--pink); min-width: 2ch; }
+.faq-q-text { font-size: clamp(16px, 1.35vw, 19px); font-weight: 600; line-height: 1.35; text-wrap: pretty; }
+/* «+» → хвиляста лінія: вертикальна риска згортається, пряма змінюється хвилею (лише transform і opacity) */
+.faq-icon { width: 26px; height: 26px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; color: var(--ink-2); overflow: visible; transition: color .3s; }
+.faq-icon path { transform-box: fill-box; transform-origin: center; transition: transform .45s var(--ease), opacity .3s var(--ease); }
+.faq-icon-w { opacity: 0; transform: scaleX(.4); stroke: url(#faq-grad); }
+.faq-item[open]:not(.is-closing) .faq-icon-v { transform: scaleY(0); opacity: 0; }
+.faq-item[open]:not(.is-closing) .faq-icon-h { opacity: 0; transform: scaleX(1.3); }
+.faq-item[open]:not(.is-closing) .faq-icon-w { opacity: 1; transform: none; }
+.faq-item[open]:not(.is-closing) .faq-icon { color: var(--white); }
+@media (hover: hover) and (pointer: fine) {
+  .faq-q:hover .faq-icon { color: var(--white); }
+}
+/* Відповідь: тонка неонова хвиля від рожевого до ціанового, під нею текст (вирівняний з текстом питання) */
+.faq-a { overflow: hidden; }
+.faq-wave { display: block; width: calc(100% - 48px); height: 8px; margin: 0 24px; overflow: visible; }
+.faq-wave path { fill: none; stroke: url(#faq-grad); stroke-width: 1.5; vector-effect: non-scaling-stroke; opacity: .85; }
+.faq-a-body { padding: 18px 24px 26px calc(24px + 2ch + 18px); color: var(--ink-2); font-size: 17px; line-height: 1.6; max-width: 62em; }
+.faq-a-body p { margin: 0 0 12px; }
+.faq-a-body p:last-child, .faq-a-body ul:last-child { margin-bottom: 0; }
+.faq-a-body ul { margin: 0 0 12px; padding-left: 20px; }
+.faq-a-body li { margin-bottom: 6px; }
+.faq-a-body li::marker { color: var(--pink); }
+.faq-a-body strong { color: var(--white); font-weight: 600; }
+.faq-link { color: var(--white); text-decoration: underline; text-decoration-color: rgba(var(--cyan-rgb), .5); text-underline-offset: 3px; overflow-wrap: anywhere; transition: text-decoration-color .25s; }
+.faq-link:hover { text-decoration-color: var(--cyan); }
+
+.faq-help { margin-top: clamp(48px, 6vw, 80px); padding: clamp(28px, 4vw, 48px); }
+.faq-help-title { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(24px, 2.6vw, 36px); line-height: 1.1; margin: 0 0 12px; }
+.faq-help .hero-ctas { margin-top: 26px; justify-content: flex-start; }
+
+/* Телефон і планшет: колонка груп стає рядом скляних чіпсів угорі, він лишається під шапкою */
+@media (max-width: 860px) {
+  html:has(.faq) { scroll-padding-top: calc(var(--header-h) + 84px); }
+  .faq { display: block; margin-top: 32px; }
+  .faq-nav { top: var(--header-h); margin: 0 calc(-1 * var(--gutter)) 24px; }
+  .faq-nav-list {
+    flex-direction: row; gap: 8px; padding: 10px var(--gutter); overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--gutter), #000 calc(100% - var(--gutter)), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 var(--gutter), #000 calc(100% - var(--gutter)), transparent);
+  }
+  .faq-nav-list::-webkit-scrollbar { display: none; }
+  .faq-nav-list::before { display: none; }
+  .faq-nav-list li { flex: none; }
+  .faq-nav-link.glass {
+    background: var(--glass-fill); border-color: var(--glass-edge); box-shadow: var(--glass-shadow);
+    -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); overflow: hidden; isolation: isolate;
+  }
+  .faq-nav-link { align-items: center; gap: 8px; padding: 0 16px; border-radius: var(--r-pill); font-size: 14px; white-space: nowrap; color: var(--ink-2); }
+  .faq-nav-link:hover { transform: none; }
+  .faq-nav-link.glass::after { left: 50%; top: auto; bottom: 5px; width: 16px; height: 2px; margin: 0 0 0 -8px; transform: scaleX(.3); }
+  .faq-nav-link.is-active { border-color: rgba(var(--pink-rgb), .45); }
+  .faq-q { gap: 14px; min-height: 64px; padding: 16px 16px 16px 18px; }
+  .faq-wave { width: calc(100% - 36px); margin: 0 18px; }
+  .faq-a-body { padding: 16px 18px 22px; font-size: 16px; }
+  .faq-help .hero-ctas { flex-direction: column; align-items: stretch; }
 }
 
 /* ---------- Сенсорні екрани й телефони ---------- */

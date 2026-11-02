@@ -8,7 +8,8 @@
      • матеріал — MeshPhysicalMaterial: transmission, thickness, ior 1.45, dispersion (райдужні краї),
        легка iridescence;
      • за склом — темний задник із тонкими кільцями «звукових хвиль», точками й неоновим світлом:
-       саме його видно крізь скло заломленим;
+       саме його видно крізь скло заломленим; на екрані від задника лишаються тільки світло й кільця —
+       тло canvas прозоре, тож під сценою видно фон сторінки й рідину за курсором (fluid.js);
      • оточення для відблисків — власне градієнтне (PMREM), без HDR-файлів;
      • світло — рожеве #FF2E9A і ціанове #00E5FF з різних боків.
 
@@ -106,13 +107,13 @@ vec3 wrDisplace(vec3 n){ return n * (1.0 + wrHeight(n)); }`;
 /* Задник за склом: темний, з тонкими кільцями, сіткою точок і плямами неонового світла.
    Неон приглушений — він видний лише крізь скло та як легке світіння навколо. */
 function makeBackdrop() {
-  return new THREE.Mesh(
+  const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(1, 1),
     new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uPink: { value: PINK }, uCyan: { value: CYAN }, uDark: { value: DARK }, uAspect: { value: 1 } },
+      uniforms: { uTime: { value: 0 }, uPink: { value: PINK }, uCyan: { value: CYAN }, uDark: { value: DARK }, uAspect: { value: 1 }, uSolid: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: /* glsl */`
-        uniform float uTime, uAspect; uniform vec3 uPink, uCyan, uDark; varying vec2 vUv;
+        uniform float uTime, uAspect, uSolid; uniform vec3 uPink, uCyan, uDark; varying vec2 vUv;
         void main(){
           vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0) * 2.0;
           float r = length(p);
@@ -129,12 +130,24 @@ function makeBackdrop() {
           col += vec3(0.9) * smoothstep(0.09, 0.0, length(g)) * 0.012 * smoothstep(1.8, 0.4, r);
           // Згасання до країв — далі сторінка темна
           col = mix(uDark, col, smoothstep(1.9, 0.7, r));
-          gl_FragColor = vec4(col, 1.0);
+          // Для заломлення в склі (прохід transmission) задник суцільний, як і раніше;
+          // на екрані — лише світло й кільця на прозорому тлі: крізь canvas видно фон сторінки й рідину
+          gl_FragColor = uSolid > 0.5 ? vec4(col, 1.0) : vec4(max(col - uDark, vec3(0.0)), 1.0);
           #include <colorspace_fragment>
+          if (uSolid < 0.5) gl_FragColor.a = max(max(gl_FragColor.r, gl_FragColor.g), gl_FragColor.b);
         }`,
       depthWrite: false,
     }),
   );
+  // Прохід transmission малює в окрему текстуру (є render target) — там задник суцільний
+  mesh.onBeforeRender = (renderer) => {
+    const solid = renderer.getRenderTarget() ? 1 : 0;
+    if (mesh.material.uniforms.uSolid.value !== solid) {
+      mesh.material.uniforms.uSolid.value = solid;
+      mesh.material.uniformsNeedUpdate = true;
+    }
+  };
+  return mesh;
 }
 
 /* Оточення для відблисків: темна «кімната» з рожевим і ціановим світлом і двома білими софтбоксами.
@@ -185,9 +198,9 @@ const yieldToMain = () => new Promise((resolve) => {
 export async function createHeroScene(host, { mobile = false, weak = false } = {}) {
   const canvas = document.createElement('canvas');
   canvas.setAttribute('aria-hidden', 'true');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile && !weak, alpha: false, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile && !weak, alpha: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2));
-  renderer.setClearColor(DARK, 1);
+  renderer.setClearColor(DARK, 0); // прозоре тло: під сценою видно фон сторінки й рідину (fluid.js)
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
