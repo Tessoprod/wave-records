@@ -1205,6 +1205,10 @@ html.wr-intro .intro {
 .faq-a-body strong { color: var(--white); font-weight: 600; }
 .faq-link { color: var(--white); text-decoration: underline; text-decoration-color: rgba(var(--cyan-rgb), .5); text-underline-offset: 3px; overflow-wrap: anywhere; transition: text-decoration-color .25s; }
 .faq-link:hover { text-decoration-color: var(--cyan); }
+/* Цитата у відповіді («> » у faq.json): тонка рожева лінія ліворуч і легка підкладка — важливе застереження */
+.faq-quote { margin: 0 0 12px; padding: 12px 16px; border-left: 2px solid var(--pink); border-radius: 0 12px 12px 0; background: rgba(var(--pink-rgb), .06); color: var(--white); }
+.faq-quote p { margin: 0; }
+.faq-a-body .faq-quote:last-child { margin-bottom: 0; }
 
 .faq-help { margin-top: clamp(48px, 6vw, 80px); padding: clamp(28px, 4vw, 48px); }
 .faq-help-title { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(24px, 2.6vw, 36px); line-height: 1.1; margin: 0 0 12px; }

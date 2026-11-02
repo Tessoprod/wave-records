@@ -562,33 +562,49 @@ export function contactsPage() {
 
 /* ---------- /faq ---------- */
 
-/** Рядок відповіді: **жирний** і клікабельні посилання (у новій вкладці). */
+/** Рядок відповіді: **жирний**, посилання [текст](https://…) і просто адреси https://… — клікабельні, у новій вкладці. */
+const faqLinkTag = (url, text) => `<a class="faq-link" href="${url}" target="_blank" rel="noopener">${text}</a>`;
 function faqInline(text) {
-  return esc(text)
+  const links = [];
+  // Спершу посилання з текстом — ховаємо їх у позначки, щоб адреса всередині не стала ще одним посиланням
+  let out = esc(text).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, label, url) => {
+    links.push(faqLinkTag(url, label));
+    return `\u0000${links.length - 1}\u0000`;
+  });
+  out = out
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/https?:\/\/[^\s<]*[^\s<.,;:!?)»"']/g, (url) => `<a class="faq-link" href="${url}" target="_blank" rel="noopener">${url.replace(/^https?:\/\//, '')}</a>`);
+    .replace(/https?:\/\/[^\s<\u0000]*[^\s<.,;:!?)»"'\u0000]/g, (url) => faqLinkTag(url, url.replace(/^https?:\/\//, '')));
+  return out.replace(/\u0000(\d+)\u0000/g, (m, i) => links[+i]);
 }
-/** Відповідь з faq.json → HTML: абзаци через порожній рядок, списки — рядки, що починаються з «- ». */
+/** Відповідь з faq.json → HTML: абзаци через порожній рядок, списки — рядки з «- », цитати — рядки з «> ». */
 export function faqAnswer(src) {
   const out = [];
   for (const chunk of String(src || '').replace(/\r/g, '').split(/\n\s*\n/)) {
     let para = [];
     let list = null;
+    let quote = null;
     const flushPara = () => { if (para.length) { out.push(`<p>${para.map(faqInline).join('<br>')}</p>`); para = []; } };
     const flushList = () => { if (list) { out.push(`<ul>${list.map((i) => `<li>${faqInline(i)}</li>`).join('')}</ul>`); list = null; } };
+    const flushQuote = () => { if (quote) { out.push(`<blockquote class="faq-quote"><p>${quote.map(faqInline).join('<br>')}</p></blockquote>`); quote = null; } };
     for (const line of chunk.split('\n')) {
       const t = line.trim();
       if (!t) continue;
-      const m = t.match(/^-\s+(.*)$/);
-      if (m) { flushPara(); (list ||= []).push(m[1]); } else { flushList(); para.push(t); }
+      let m;
+      if ((m = t.match(/^>\s?(.*)$/))) { flushPara(); flushList(); (quote ||= []).push(m[1]); continue; }
+      flushQuote();
+      if ((m = t.match(/^-\s+(.*)$/))) { flushPara(); (list ||= []).push(m[1]); } else { flushList(); para.push(t); }
     }
     flushPara();
     flushList();
+    flushQuote();
   }
   return raw(out.join(''));
 }
 /** Текст відповіді без розмітки — для JSON-LD (schema.org FAQPage). */
-const faqPlain = (src) => String(src || '').replace(/\r/g, '').replace(/\*\*(.+?)\*\*/g, '$1').trim();
+const faqPlain = (src) => String(src || '').replace(/\r/g, '')
+  .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1 ($2)') // [текст](адреса) → «текст (адреса)»
+  .replace(/^>\s?/gm, '') // позначки цитат
+  .replace(/\*\*(.+?)\*\*/g, '$1').trim();
 
 /** Лінія-хвиля під питанням (промальовується при відкритті): 40 півхвиль на ширину блоку. */
 const FAQ_WAVE = `M0 4${Array.from({ length: 40 }, (_, i) => (i ? ` T${(i + 1) * 10} 4` : ' Q5 0 10 4')).join('')}`;
