@@ -374,6 +374,11 @@ function about() {
     if (reduceMotion) timeline.style.setProperty('--tl-p', 1);
     else gsap.fromTo(timeline, { '--tl-p': 0 }, { '--tl-p': 1, ease: 'none', scrollTrigger: { trigger: timeline, start: 'top 70%', end: 'bottom 70%', scrub: 0.4 } });
   }
+  // Номери етапів: на своєму місці на лінії з першого кадру, лише проявляються й трохи виростають (окремо від тексту)
+  $$('.tl-num').forEach((num) => {
+    if (reduceMotion) return;
+    gsap.fromTo(num, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.7, ease: EASE, clearProps: 'transform', scrollTrigger: onceAt(num.parentElement) });
+  });
   // Фото етапів відкриваються маскою, всередині рамки — легкий паралакс
   $$('.tl-media').forEach((media) => {
     if (reduceMotion) return; // без руху фото видно одразу

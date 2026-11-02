@@ -317,8 +317,10 @@ export function aboutPage({ photos }) {
           const p = processPhoto(i);
           return html`
           <li class="tl-item">
+            <!-- Номер — прямо в .tl-item, не в .tl-text: текст з'являється зі зсувом (transform), і номер усередині
+                 нього на час анімації позиціонувався б відносно тексту (поверх першої літери), а потім стрибав -->
+            <span class="tl-num">${String(i + 1).padStart(2, '0')}</span>
             <div class="tl-text">
-              <span class="tl-num">${String(i + 1).padStart(2, '0')}</span>
               <h3 class="tl-title">${it.title}</h3>
               <p>${it.text}</p>
             </div>

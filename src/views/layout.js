@@ -106,15 +106,16 @@ var still=matchMedia('(prefers-reduced-motion: reduce)').matches,fm=+get('wr_fro
 if(!still){d.classList.add('wr-anim');if(!get('wr_intro')){d.classList.add('wr-intro');try{s.setItem('wr_intro','1')}catch(e){}}else if(fm&&Date.now()-fm<15000)d.classList.add('from-menu')}
 if(!d.classList.contains('from-menu'))del('wr_from_menu');
 function quiet(v){function n(){}v.ready.catch(n);v.finished.catch(n);if(v.updateCallbackDone)v.updateCallbackDone.catch(n);return v}
-w.wrRevealed=new Promise(function(r){if(!('onpagereveal' in w))return r();w.addEventListener('pagereveal',function(e){var v=e.viewTransition&&quiet(e.viewTransition);if(v){if(d.classList.contains('from-menu'))v.skipTransition();else{d.classList.add('vt-in');w.wrViewTransition=v}}r()},{once:true});setTimeout(r,1500)});
-w.addEventListener('pageswap',function(e){var v=e.viewTransition&&quiet(e.viewTransition);if(v&&get('wr_from_menu'))v.skipTransition()});
+w.wrRevealed=new Promise(function(r){if(!('onpagereveal' in w))return r();w.addEventListener('pagereveal',function(e){var v=e.viewTransition&&quiet(e.viewTransition);if(v&&!d.classList.contains('from-menu')){d.classList.add('vt-in');w.wrViewTransition=v}r()},{once:true});setTimeout(r,1500)});
+w.addEventListener('pageswap',function(e){if(e.viewTransition)quiet(e.viewTransition)});
 function reveal(){d.classList.remove('wr-anim','wr-intro','from-menu');d.classList.add('wr-failsafe');del('wr_from_menu')}
 function check(){if(!(w.wrMotion&&w.wrMotion.ready))reveal()}document.addEventListener('DOMContentLoaded',function(){setTimeout(check,0)});setTimeout(check,10000);
 w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.contentStarted))reveal()},3000)}})(document.documentElement,window)</script>
   <meta name="color-scheme" content="dark">
-  <!-- Критичний CSS: темний фон з першого кадру (без сірого чи білого проміжку між сторінками) і опущена шторка
+  <!-- Критичний CSS: темний фон з першого кадру — лише на html (body прозорий: власний фон body лежав би над
+       canvas хвиль і рідини з z-index -1 і ховав їх) — і опущена шторка
        в стані from-menu — така сама, як шторка меню (темна заливка #111111 на весь екран). Решта — у site.css -->
-  <style>html,body{background:#111111;color-scheme:dark}.page-curtain{display:none}html.from-menu .page-curtain{display:block;position:fixed;inset:0;z-index:45}.page-curtain svg{position:absolute;inset:0;width:100%;height:100%}.page-curtain-fill{fill:#111111}.page-curtain-edge{fill:none;opacity:0}</style>
+  <style>html{background:#111111;color-scheme:dark}body{background:transparent}.page-curtain{display:none}html.from-menu .page-curtain{display:block;position:fixed;inset:0;z-index:45}.page-curtain svg{position:absolute;inset:0;width:100%;height:100%}.page-curtain-fill{fill:#111111}.page-curtain-edge{fill:none;opacity:0}</style>
   <title>${fullTitle}</title>
   <meta name="description" content="${desc}">
   <meta name="theme-color" content="#111111">

@@ -60,13 +60,15 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 16px); }
+/* Колір документа — на html. body прозорий: якщо фон має і html, і body, фон body вже не переходить на документ,
+   а малюється поверх шарів з z-index: -1 (.bg — хвилі, .fluid — рідина) і ховає їх */
+html { background: var(--black); -webkit-text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 16px); }
 /* Коли працює плавний скрол Lenis (motion.js), вбудоване плавне прокручування браузера йому заважає */
 html.lenis { scroll-behavior: auto; }
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--black);
+  background: transparent;
   color: var(--white);
   font: 400 17px/1.55 var(--font-text);
   font-feature-settings: 'ss01', 'cv11';
@@ -935,6 +937,7 @@ html.wr-anim :is(.book-embed, .cta-band, .tl-text, .empty-state) { opacity: 0; }
 html.wr-anim :is(main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn,
   .section-steps .steps, .steps-cta, .marquee, .book-help, .faq-nav, .faq-group-title, .faq-help, .faq-home-ctas, .site-footer) { opacity: 0; }
 html.wr-anim .tl-media { clip-path: inset(100% 0 0 0); }
+html.wr-anim .tl-num { opacity: 0; }
 html.wr-anim .steps { --steps-p: 0; }
 html.wr-anim .timeline { --tl-p: 0; }
 
@@ -1058,6 +1061,16 @@ html.wr-intro .intro {
 }
 ::view-transition-old(vt-curtain), ::view-transition-new(vt-curtain) { display: none; }
 @keyframes vt-curtain { from { transform: translateY(100%); } to { transform: translateY(-100%); } }
+
+/* Перехід з меню (на новій сторінці html.from-menu): шторка меню старої сторінки й опущена шторка нової — спільний
+   елемент menu-curtain. Браузер тримає старий кадр, доки нова сторінка не готова, і міняє кадри миттєво, без анімацій
+   і без проміжного кадру; шапка — та сама (site-header). Далі шторку піднімає скрипт у layout.js (wrCurtainLift).
+   Браузери без View Transitions просто відкривають сторінку з опущеною шторкою (критичний CSS у <head>). */
+body.menu-open .menu-wave { view-transition-name: menu-curtain; }
+html.from-menu .page-curtain { view-transition-name: menu-curtain; }
+html.from-menu::view-transition-group(*), html.from-menu::view-transition-new(*) { animation: none; }
+html.from-menu::view-transition-old(*) { display: none; }
+html.from-menu::view-transition-group(vt-curtain) { display: none; }
 
 
 /* Без руху — лише коротке проявлення */
