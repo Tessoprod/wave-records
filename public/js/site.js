@@ -234,20 +234,12 @@
   }
   const scheduleGlass = () => { if (!glassRaf) glassRaf = requestAnimationFrame(glassFrame); };
 
-  // Телефони й планшети (сенсорний екран): полегшений відблиск — смуга світла один раз пробігає по скляному блоку,
-  // коли він з'являється на екрані (клас is-sheen → CSS-анімація лише transform і opacity), без обробки прокрутки
-  if (!reduceMotion && !finePointer && 'IntersectionObserver' in window) {
-    const sheenIO = new IntersectionObserver((entries) => {
-      for (const en of entries) {
-        if (!en.isIntersecting) continue;
-        en.target.classList.add('is-sheen');
-        sheenIO.unobserve(en.target);
-      }
-    }, { threshold: 0.35 });
-    $$('main .glass:not(.btn-glass):not(.faq-nav-link)').forEach((el) => sheenIO.observe(el));
-  }
-  // Смуга світла, що рухається при прокрутці, — лише на комп'ютерах; на телефонах скло статичне й легке
-  if (!reduceMotion && finePointer) {
+  // Смуга світла рухається при прокрутці — на комп'ютерах і на телефонах, у прокрутці вниз і вгору. Легко:
+  // IntersectionObserver тримає список видимих скляних блоків, на прокрутку (слухачі passive) — один
+  // requestAnimationFrame на кадр, що оновлює --sy лише видимим блокам (getBoundingClientRect лише для них);
+  // прокрутка зупинилась — подій немає, кадрів теж. Сама смуга — ::before, рухається лише transform.
+  // Курсор (--px, нахил, відблиск по краю) — тільки для миші. prefers-reduced-motion — без руху.
+  if (!reduceMotion) {
     const glassIO = 'IntersectionObserver' in window && new IntersectionObserver((entries) => {
       entries.forEach((en) => (en.isIntersecting ? visibleGlass.add(en.target) : visibleGlass.delete(en.target)));
       scheduleGlass();

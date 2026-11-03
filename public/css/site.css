@@ -521,20 +521,22 @@ html.lifting .header-book { transition: opacity .4s cubic-bezier(.45, 0, .55, 1)
 }
 /* Телефон: під пунктами — FAQ, «Записатися», адреса (Google Maps) і внизу один ряд «Телефон | Telegram».
    Усі — скляні пігулки однакової висоти й ширини по центру (телефон і Telegram — по половині ширини);
-   «Записатися» — те саме скло з рожевим відтінком. Порядок задає order (половини — display: contents) */
+   «Записатися» — неонова, як на першому екрані. Порядок задає order (половини — display: contents) */
 @media (max-width: 640px) {
   .menu-foot { --m-btn: 48px; grid-template-columns: 1fr 1fr; column-gap: 8px; row-gap: 8px; }
-  .menu-foot .btn { min-height: var(--m-btn); height: var(--m-btn); width: 100%; margin: 0; justify-self: stretch; font-size: 14px; padding: 0 14px; }
+  .menu-foot .btn { min-height: var(--m-btn); height: var(--m-btn); width: 100%; margin: 0; justify-self: stretch; }
+  /* Контакти й FAQ — дрібніший шрифт; «Записатися» — точно та сама неонова кнопка, що на першому екрані головної
+     (.btn-neon: заливка, темний текст, шрифт, регістр, стрілка, світіння, реакція на натискання), лише висота й
+     ширина як у сусідніх кнопок */
+  .menu-foot .btn:not(.menu-book) { font-size: 14px; padding: 0 14px; }
   .menu-faq-mob { order: 1; grid-column: 1 / -1; min-width: 0; }
-  .menu-book { order: 2; grid-column: 1 / -1; color: var(--white); background: linear-gradient(180deg, rgba(var(--pink-rgb), .26), rgba(var(--pink-rgb), .12));
-    border: 1px solid rgba(var(--pink-rgb), .5); box-shadow: var(--glass-shadow), 0 0 22px rgba(var(--pink-rgb), .18);
-    -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+  .menu-book { order: 2; grid-column: 1 / -1; }
   .menu-addr { order: 3; grid-column: 1 / -1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1; }
   .menu-phone { order: 4; grid-column: 1; }
   .menu-tg { order: 5; grid-column: 2; }
   .menu-foot:not(:has(.menu-tg)) .menu-phone { grid-column: 1 / -1; }
 }
-@media (max-width: 370px) { .menu-foot .btn { font-size: 13px; padding: 0 10px; } }
+@media (max-width: 370px) { .menu-foot .btn:not(.menu-book) { font-size: 13px; padding: 0 10px; } }
 /* Невисокий телефон (до 760 px): номер — ліворуч від назви, а не над нею, пункти трохи менші — усе меню вміщається
    в екран від 640 px без прокрутки */
 @media (max-width: 640px) and (max-height: 760px) {
@@ -728,7 +730,10 @@ html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 .steps::before { content: ''; position: absolute; top: 9px; left: var(--steps-from, 10px); right: var(--steps-to, calc((100% - 4 * 24px) / 5 - 10px)); height: 2px; background: linear-gradient(90deg, var(--pink), rgba(var(--pink-rgb), .2) 70%, rgba(245, 245, 245, .12)); border-radius: 2px; }
 .step { position: relative; display: flex; flex-direction: column; gap: 10px; }
 .step-dot { position: absolute; z-index: 1; top: -34px; left: 0; width: 20px; height: 20px; border-radius: 50%; background: var(--black); border: 2px solid var(--pink); }
-.step:first-child .step-dot { background: var(--pink); box-shadow: 0 0 22px rgba(var(--pink-rgb), .35); }
+.step:first-child .step-dot { --f: 1; box-shadow: 0 0 22px rgba(var(--pink-rgb), .35); }
+/* Заливка кола — окремий шар, що відкривається clip-path з того боку, звідки приходить лінія (--f від 0 до 1 ставить
+   motion.js за положенням голови лінії; без JS залите лише перше коло) */
+.step-dot::before { content: ''; position: absolute; inset: -2px; border-radius: 50%; background: var(--pink); clip-path: inset(0 calc((1 - var(--f, 0)) * 100%) 0 0); }
 .step .num { font-size: 15px; font-family: var(--font-text); font-weight: 600; letter-spacing: .06em; }
 .step-title { font-size: clamp(18px, 1.6vw, 23px); line-height: 1.08; }
 .steps-cta { margin-top: clamp(36px, 5vw, 56px); }
@@ -1055,13 +1060,18 @@ html.wr-anim .timeline { --tl-p: 0; }
   box-shadow: 0 0 12px rgba(var(--pink-rgb), .35);
   transform-origin: 0 50%; transform: scaleX(var(--steps-p, 1));
 }
-.step { transition: opacity .5s var(--ease); }
-.step-dot { transition: background-color .4s var(--ease), box-shadow .4s var(--ease); }
+.step { transition: opacity .35s var(--ease); }
+.step-dot { transition: box-shadow .4s var(--ease); }
+/* Голова лінії — м'яке світіння, що рухається разом із нею (лише transform), під колами; наприкінці згасає */
+.steps-head {
+  position: absolute; left: 0; top: 0; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(245, 245, 245, .35) 0, rgba(var(--pink-rgb), .3) 30%, rgba(var(--pink-rgb), 0) 70%);
+  opacity: 0; will-change: transform, opacity;
+}
 .step-title { text-shadow: 0 2px 24px rgba(17, 17, 17, .7); }
 /* Неактивні кроки приглушені, але текст лишається контрастним (≈ 4.9:1, WCAG AA) */
 html.wr-anim .step:not(.is-on) { opacity: .5; }
-html.wr-anim .step:first-child:not(.is-on) .step-dot { background: var(--black); box-shadow: none; }
-.step.is-on .step-dot { background: var(--pink); }
+html.wr-anim .step:first-child:not(.is-on) .step-dot { box-shadow: none; }
 .step.is-current .step-dot { box-shadow: 0 0 22px rgba(var(--pink-rgb), .35); }
 
 /* Про студію: лінія таймлайну заповнюється при скролі */
@@ -1196,6 +1206,7 @@ html.from-menu::view-transition-group(vt-curtain) { display: none; }
   .steps { grid-template-columns: 1fr; gap: 26px; padding: 0 0 0 40px; }
   .steps::before { top: var(--steps-from, 12px); bottom: var(--steps-to, 10px); left: 9px; right: auto; width: 2px; height: auto; background: linear-gradient(var(--pink), rgba(var(--pink-rgb), .2) 70%, rgba(245, 245, 245, .12)); }
   .step-dot { top: 2px; left: -40px; }
+  .step-dot::before { clip-path: inset(0 0 calc((1 - var(--f, 0)) * 100%) 0); }
   .phil-head { grid-template-columns: 1fr; }
   .phil-grid { grid-template-columns: 1fr; }
   .phil-item { min-height: 0; }
@@ -1423,17 +1434,6 @@ html.from-menu::view-transition-group(vt-curtain) { display: none; }
   html.js:not(.kbd-nav) .menu-links a:focus-visible { transform: none; }
   html.js:not(.kbd-nav) .menu-links a:focus-visible .menu-line { clip-path: inset(-4px 100% -4px 0); }
   html.js:not(.kbd-nav) :is(.svc-grid, .svc-full-grid, .bento, .book-info, .phil-grid, .tracks, .faq-list):has(:focus-visible) > :not(:focus-within) { filter: none; opacity: 1 !important; }
-}
-
-/* Телефони й планшети: смуга світла один раз пробігає по скляному блоку, коли він з'являється на екрані (is-sheen
-   ставить site.js через IntersectionObserver) і зупиняється у звичайному положенні — без стрибка в кінці */
-@media (max-width: 860px), (pointer: coarse) {
-  .glass.is-sheen::before { animation: glass-sheen 1.2s cubic-bezier(.25, .6, .3, 1) both; }
-}
-@keyframes glass-sheen {
-  0% { transform: translate3d(-42%, 0, 0); opacity: 0; }
-  25% { opacity: 1; }
-  100% { transform: translate3d(0, 0, 0); opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
