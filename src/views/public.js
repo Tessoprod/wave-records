@@ -1,5 +1,5 @@
 import { html, raw, esc, nl2br, miniMarkdown } from '../html.js';
-import { layout, icon, telLink } from './layout.js';
+import { layout, icon, telLink, mapsUrl } from './layout.js';
 import { block } from '../content.js';
 import { getSettings } from '../settings.js';
 import { config } from '../config.js';
@@ -176,6 +176,25 @@ export function homePage({ homeServices, tracks, faq = null }) {
 
 /* ---------- /services ---------- */
 
+/** Навігація-прогрес по розділах — той самий компонент, що на FAQ (стилі .faq-nav у site.css, логіка sectionNav() у
+    site.js): на десктопі закріплена колонка ліворуч, поточний розділ підсвічується; на телефоні — ряд скляних чіпсів
+    під шапкою. items — [[id, назва], …]. */
+const sectionNav = (label, items) => html`
+    <nav class="faq-nav" aria-label="${label}" data-faq-nav>
+      <ol class="faq-nav-list" role="list">
+        ${items.map(([id, title], i) => html`<li><a class="faq-nav-link glass" href="#${id}" data-faq-link><span class="faq-nav-num" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span><span>${title}</span></a></li>`)}
+      </ol>
+    </nav>`;
+/** Сторінка з навігацією по розділах: ліворуч навігація, праворуч розділи (sections — [{ id, title, body }]). */
+const sectionLayout = (label, sections) => html`
+  <div class="container sec-layout" data-secnav>
+    ${sectionNav(label, sections.map((x) => [x.id, x.title]))}
+    <div class="sec-main">
+      ${sections.map((x) => html`
+      <section class="sec-part" id="${x.id}" data-secnav-group>${x.body}</section>`)}
+    </div>
+  </div>`;
+
 export function servicesPage({ sound, media, business = [] }) {
   const c = block('services');
   const tg = telegramUrl();
@@ -202,26 +221,13 @@ export function servicesPage({ sound, media, business = [] }) {
     <h1 class="h1">${c.title}</h1>
     ${c.text ? html`<p class="page-lead">${c.text}</p>` : ''}
   </section>
-  <section class="section section-tight" id="sound">
-    <div class="container">
-      <h2 class="h2 h-latin">${c.sound_title}</h2>
-      <ul class="svc-full-grid" role="list">${sound.map(card)}</ul>
-    </div>
-  </section>
-  ${media.length ? html`
-  <section class="section" id="media">
-    <div class="container">
-      <h2 class="h2 h-latin">${c.media_title}</h2>
-      <ul class="svc-full-grid" role="list">${media.map(card)}</ul>
-    </div>
-  </section>` : ''}
-  ${business.length ? html`
-  <section class="section" id="business">
-    <div class="container">
-      <h2 class="h2 h-latin">${c.business_title || 'BUSINESS'}</h2>
-      <ul class="svc-full-grid" role="list">${business.map(card)}</ul>
-    </div>
-  </section>` : ''}`;
+  ${sectionLayout('Розділи послуг', [
+    { id: 'sound', title: c.sound_title, list: sound },
+    { id: 'media', title: c.media_title, list: media },
+    { id: 'business', title: c.business_title || 'BUSINESS', list: business },
+  ].filter((x) => x.list.length).map((x) => ({ ...x, body: html`
+        <h2 class="h2 h-latin">${x.title}</h2>
+        <ul class="svc-full-grid" role="list">${x.list.map(card)}</ul>` })))}`;
   return layout({ title: c.title, path: '/services', description: 'Ціни на запис, зведення, мастеринг, біти, пісні під ключ та послуги для релізу у Wave Records.', body });
 }
 
@@ -229,27 +235,22 @@ export function servicesPage({ sound, media, business = [] }) {
 
 export function portfolioPage({ vocal, music, b2b }) {
   const c = block('portfolio');
-  const part = (id, title, sub, tracks) => html`
-  <section class="section section-tight" id="${id}">
-    <div class="container">
-      <header class="sec-head sec-head-stack">
-        <h2 class="h2 h-latin">${title}</h2>
-        ${sub ? html`<p class="sec-sub">${sub}</p>` : ''}
-      </header>
-      ${trackList(tracks)}
-    </div>
-  </section>`;
+  const part = (id, title, sub, tracks) => ({ id, title, body: html`
+        <header class="sec-head sec-head-stack">
+          <h2 class="h2 h-latin">${title}</h2>
+          ${sub ? html`<p class="sec-sub">${sub}</p>` : ''}
+        </header>
+        ${trackList(tracks)}` });
   const body = html`
   <section class="page-head container">
     <h1 class="h1">${c.title}</h1>
     ${c.text ? html`<p class="page-lead">${c.text}</p>` : ''}
-    <nav class="chips" aria-label="Розділи портфоліо">
-      <a class="chip" href="#vocal">${c.vocal_title}</a><a class="chip" href="#music">${c.music_title}</a><a class="chip" href="#b2b">${c.b2b_title}</a>
-    </nav>
   </section>
-  ${part('vocal', c.vocal_title, c.vocal_sub, vocal)}
-  ${part('music', c.music_title, c.music_sub, music)}
-  ${part('b2b', c.b2b_title, c.b2b_sub, b2b)}
+  ${sectionLayout('Розділи портфоліо', [
+    part('vocal', c.vocal_title, c.vocal_sub, vocal),
+    part('music', c.music_title, c.music_sub, music),
+    part('b2b', c.b2b_title, c.b2b_sub, b2b),
+  ])}
   <section class="section">
     <div class="container cta-band glass">
       <h2 class="h2">Хочете так само?</h2>
@@ -540,7 +541,7 @@ export function staticBookPage({ booking }) {
 
 export function contactsPage() {
   const c = block('contacts');
-  const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${c.address}, ${c.city}`)}`;
+  const mapUrl = mapsUrl(c); // те саме посилання, що й в адресі в меню
   const body = html`
   <section class="page-head container">
     <h1 class="h1">${c.title}</h1>
@@ -689,11 +690,7 @@ export function faqPage(faq) {
        анімація відкриття — motion.js (wrMotion.faqAnim). Без JS працюють нативні details/summary. -->
   <div class="container faq" data-faq data-faq-hash>
     ${FAQ_DEFS}
-    <nav class="faq-nav" aria-label="Групи питань" data-faq-nav>
-      <ol class="faq-nav-list" role="list">
-        ${groups.map((g, i) => html`<li><a class="faq-nav-link glass" href="#${g.id}" data-faq-link><span class="faq-nav-num" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span><span>${g.title}</span></a></li>`)}
-      </ol>
-    </nav>
+    ${sectionNav('Групи питань', groups.map((g) => [g.id, g.title]))}
     <div class="faq-main">
       ${groups.map((g) => html`
       <section class="faq-group" id="${g.id}" aria-labelledby="faq-h-${g.id}" data-faq-group>

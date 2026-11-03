@@ -130,6 +130,7 @@
          нова сторінка відкривається з опущеною шторкою і піднімає її (motion.js, curtainLift),
          View Transition для такого переходу вимикає скрипт у <head>;
        • решта (телефон, Telegram, нова вкладка) — як звичайно, меню закривається. */
+  let navLoaderTimer = 0;
   const samePath = (a, b) => (a.replace(/\/+$/, '') || '/') === (b.replace(/\/+$/, '') || '/');
   menu?.addEventListener('click', (e) => {
     const a = e.target.closest('a');
@@ -143,10 +144,11 @@
     }
     if (internal && !reduceMotion && window.wrMotion?.menuAnim) {
       try { sessionStorage.setItem('wr_from_menu', String(Date.now())); } catch { setMenu(false); return; }
-      // Поверх опущеної шторки одразу — лоадер-хвиля з інтро; пункти меню згасають. Нова сторінка показує ту саму
-      // хвилю з першого кадру (фаза від годинника), тож анімація виглядає безперервною
+      // Пункти меню плавно згасають, шторка стає суцільною. Лоадер-хвиля — лише якщо нова сторінка не відкрилась
+      // за 250 мс (нова сторінка рахує той самий відлік від позначки й продовжує ту саму хвилю — фаза від годинника)
       document.documentElement.classList.add('nav-leaving');
-      window.wrNavLoader?.start();
+      clearTimeout(navLoaderTimer);
+      navLoaderTimer = setTimeout(() => window.wrNavLoader?.start(), 250);
       return; // шторку не піднімаємо — браузер переходить на нову сторінку
     }
     setMenu(false);
@@ -155,7 +157,7 @@
   // меню там ще відкрите — піднімаємо шторку, як при закритті
   addEventListener('pageshow', (e) => {
     try { sessionStorage.removeItem('wr_from_menu'); } catch { /* приватний режим */ }
-    if (e.persisted) { document.documentElement.classList.remove('nav-leaving'); window.wrNavLoader?.stop(); }
+    if (e.persisted) { clearTimeout(navLoaderTimer); document.documentElement.classList.remove('nav-leaving'); window.wrNavLoader?.stop(); }
     if (e.persisted && isOpen()) setMenu(false);
   });
   document.addEventListener('keydown', (e) => {
@@ -493,6 +495,51 @@
     });
   }
 
+  /* ---------- Навігація-прогрес по розділах (FAQ, Послуги, Портфоліо) ----------
+     Розмітка — sectionNav() у public.js: на десктопі закріплена колонка ліворуч, на телефоні — ряд скляних чіпсів
+     під шапкою. Поточний розділ — останній, чий верх уже вище лінії на 35 % висоти екрана (угорі сторінки — перший);
+     ряд чіпсів гортається вбік так, щоб активний чіпс було видно. Клік по пункту — плавна прокрутка (якорі веде motion.js).
+     Повертає функцію оновлення: update('instant') — миттєво доставити активний чіпс у видиму зону. */
+  function sectionNav(scope, groups) {
+    const links = $$('[data-faq-link]', scope);
+    const navRow = $('.faq-nav-list', scope);
+    if (!groups.length || !links.length) return () => {};
+    let active = null;
+    const showChip = (a, behavior) => {
+      if (a && navRow && navRow.scrollWidth > navRow.clientWidth + 1) {
+        navRow.scrollTo({ left: a.offsetLeft - (navRow.clientWidth - a.offsetWidth) / 2, behavior });
+      }
+    };
+    const setActive = (id, behavior = reduceMotion ? 'auto' : 'smooth') => {
+      if (id === active) {
+        // Повторно — лише щоб миттєво доставити чіпс у видиму зону (після стрибка сторінки чи завантаження шрифтів)
+        if (behavior === 'instant') showChip(links.find((a) => a.hash === `#${id}`), 'instant');
+        return;
+      }
+      active = id;
+      links.forEach((a) => {
+        const on = a.hash === `#${id}`;
+        a.classList.toggle('is-active', on);
+        if (on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+        if (on) showChip(a, behavior);
+      });
+    };
+    let ticking = false;
+    const update = (behavior) => {
+      ticking = false;
+      const line = innerHeight * 0.35;
+      let cur = groups[0];
+      for (const g of groups) if (g.getBoundingClientRect().top <= line) cur = g;
+      setActive(cur.id, typeof behavior === 'string' ? behavior : undefined);
+    };
+    addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(() => update()); } }, { passive: true });
+    addEventListener('resize', () => update(), { passive: true });
+    update('instant');
+    // Шрифти змінюють ширину чіпсів — після них ще раз ставимо активний на місце
+    document.fonts?.ready.then(() => update('instant'));
+    return update;
+  }
+
   /* ---------- Питання та відповіді (/faq) ----------
      Основа — нативні details/summary: без JS усе відкривається й закривається саме.
      Тут: у межах групи відкрите одне питання; aria-expanded на summary; хеш в URL (#installments)
@@ -550,6 +597,7 @@
       });
     });
 
+    let updateActive = () => {};
     // Хеш → відкрити питання і прокрутити до нього
     const byHash = (hash) => {
       let id = '';
@@ -579,48 +627,10 @@
       if (d) setItem(d, true, { hash: false });
     });
 
-    const links = $$('[data-faq-link]', faq);
-    const navRow = $('.faq-nav-list', faq);
-    const groups = $$('[data-faq-group]', faq);
-    let active = null;
-    let updateActive = () => {};
-    // Ряд чіпсів на телефоні гортається вбік так, щоб активний чіпс було видно
-    const showChip = (a, behavior) => {
-      if (a && navRow && navRow.scrollWidth > navRow.clientWidth + 1) {
-        navRow.scrollTo({ left: a.offsetLeft - (navRow.clientWidth - a.offsetWidth) / 2, behavior });
-      }
-    };
-    const setActive = (id, behavior = reduceMotion ? 'auto' : 'smooth') => {
-      if (id === active) {
-        // Повторно — лише щоб миттєво доставити чіпс у видиму зону (після стрибка сторінки чи завантаження шрифтів)
-        if (behavior === 'instant') showChip(links.find((a) => a.hash === `#${id}`), 'instant');
-        return;
-      }
-      active = id;
-      links.forEach((a) => {
-        const on = a.hash === `#${id}`;
-        a.classList.toggle('is-active', on);
-        if (on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
-        if (on) showChip(a, behavior);
-      });
-    };
-    // Поточна — остання група, чий верх уже вище лінії на 35 % висоти екрана (угорі сторінки — перша)
-    if (groups.length) {
-      let ticking = false;
-      const update = updateActive = (behavior) => {
-        ticking = false;
-        const line = innerHeight * 0.35;
-        let cur = groups[0];
-        for (const g of groups) if (g.getBoundingClientRect().top <= line) cur = g;
-        setActive(cur.id, typeof behavior === 'string' ? behavior : undefined);
-      };
-      addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(() => update()); } }, { passive: true });
-      addEventListener('resize', () => update(), { passive: true });
-      update('instant');
-      // Шрифти змінюють ширину чіпсів — після них ще раз ставимо активний на місце
-      document.fonts?.ready.then(() => update('instant'));
-    }
+    updateActive = sectionNav(faq, $$('[data-faq-group]', faq));
   }
+  // Навігація-прогрес на сторінках Послуги й Портфоліо — той самий компонент, що на FAQ
+  $$('[data-secnav]').forEach((el) => sectionNav(el, $$('[data-secnav-group]', el)));
 
   /* ---------- Галерея ---------- */
   const lightbox = $('[data-lightbox]');

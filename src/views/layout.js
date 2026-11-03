@@ -54,6 +54,9 @@ export const NAV = [
 /** Футер, «Сторінки»: дві колонки по три (заповнюються згори донизу), FAQ — одразу після «Запис». */
 const FOOTER_PAGES = [...NAV.slice(1, 5), ['/faq', 'FAQ'], ...NAV.slice(5)];
 
+/** Посилання на Google Maps за адресою студії — одне для меню й сторінки Контакти. */
+export const mapsUrl = (c) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${c.address}, ${c.city}`)}`;
+
 export function telLink(phone) {
   return `tel:${String(phone || '').replace(/[^\d+]/g, '')}`;
 }
@@ -118,7 +121,7 @@ w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.con
        canvas хвиль і рідини з z-index -1 і ховав їх) — і опущена шторка
        в стані from-menu — така сама, як шторка меню (темна заливка #111111 на весь екран); лоадер-хвиля з інтро
        (.nav-loader) — видно з першої відмальовки в стані from-menu і на старій сторінці після кліку (nav-leaving). Решта — у site.css -->
-  <style>html{background:#111111;color-scheme:dark}body{background:transparent}.page-curtain{display:none}html.from-menu .page-curtain{display:block;position:fixed;inset:0;z-index:45}.page-curtain svg{position:absolute;inset:0;width:100%;height:100%}.page-curtain-fill{fill:#111111}.page-curtain-edge{fill:none;opacity:0}.nav-loader{display:none;position:fixed;left:0;right:0;top:50%;height:160px;margin-top:-80px;z-index:46;pointer-events:none;transition:opacity .5s cubic-bezier(.2,.8,.2,1),transform .5s cubic-bezier(.2,.8,.2,1)}html.from-menu .nav-loader,html.nav-leaving .nav-loader{display:block}.nav-loader svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}.nav-loader path{fill:none;stroke:url(#nav-loader-grad);stroke-width:2;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 6px rgba(255,46,154,.35))}.nav-loader.is-out{opacity:0;transform:scaleY(3)}</style>
+  <style>html{background:#111111;color-scheme:dark}body{background:transparent}.page-curtain{display:none}html.from-menu .page-curtain{display:block;position:fixed;inset:0;z-index:45}.page-curtain svg{position:absolute;inset:0;width:100%;height:100%}.page-curtain-fill{fill:#111111}.page-curtain-edge{fill:none;opacity:0}.nav-loader{display:none;position:fixed;left:0;right:0;top:50%;height:160px;margin-top:-80px;z-index:46;pointer-events:none;opacity:0;transition:opacity .25s cubic-bezier(.45,0,.55,1)}.nav-loader.is-on{opacity:1}.nav-loader.is-now{transition:none}html.from-menu .nav-loader,html.nav-leaving .nav-loader{display:block}.nav-loader svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}.nav-loader path{fill:none;stroke:url(#nav-loader-grad);stroke-width:2;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 6px rgba(255,46,154,.35))}</style>
   <title>${fullTitle}</title>
   <meta name="description" content="${desc}">
   <meta name="theme-color" content="#111111">
@@ -153,37 +156,43 @@ w.wrArmFailsafe=function(){setTimeout(function(){if(!(w.wrMotion&&w.wrMotion.con
     </svg>
   </div>
   <!-- Підйом шторки після переходу з меню — тут, а не в motion.js: не чекає GSAP, 3D, фото, аудіо й рідину.
-       Лоадер-хвиля показується щонайменше ~400 мс і не довше, ніж до готовності сторінки (шрифти, фон bg.js, перша
-       відмальовка), але не більше ~1,5 с; потім хвиля розгортається, і шторка піднімається тією самою хвилею, що при
-       закритті меню (0,75 с). Після підйому знімає from-menu і позначку; motion.js чекає window.wrCurtainLift. -->
+       Шторка піднімається одним плавним рухом (0,55 с, power2.inOut), щойно сторінка готова (шрифти, фон bg.js,
+       перша відмальовка; не пізніше ~1,2 с від кліку). Лоадер-хвиля з'являється лише тоді, коли від кліку минуло
+       250 мс, а сторінка ще не готова (відлік від позначки wr_from_menu — часу кліку), і згасає разом із підйомом.
+       На початку підйому — клас lifting і window.wrCurtainLifting (з ним motion.js починає показ контенту),
+       наприкінці знімає from-menu і позначку; motion.js чекає window.wrCurtainLift. -->
   <!-- Лоадер переходу з меню: та сама хвиля, що в інтро (графіка, кольори, формула), без лічильника й «Пропустити».
        Фаза хвилі рахується від годинника (Date.now), тож на старій і новій сторінці вона та сама — продовження без стрибка.
        wrNavLoader.start() — запускає (на старій сторінці викликає site.js після кліку по пункту меню, на новій — одразу),
-       out() — хвиля вирівнюється й м'яко розгортається (як у кінці інтро), stop() — зупиняє. -->
+       start(true) — одразу видно (продовження лоадера старої сторінки), start() — плавно з'являється; out() — плавно
+       згасає, stop() — зупиняє. -->
   <div class="nav-loader" data-nav-loader aria-hidden="true">
     <svg viewBox="0 0 1000 200" preserveAspectRatio="none" focusable="false">
       <defs><linearGradient id="nav-loader-grad" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#FF2E9A" stop-opacity="0"/><stop offset=".3" stop-color="#FF2E9A"/><stop offset=".7" stop-color="#00E5FF"/><stop offset="1" stop-color="#00E5FF" stop-opacity="0"/></linearGradient></defs>
       <path d="M0 100 L1000 100"/>
     </svg>
   </div>
-  <script>(function(d,w){var L=document.querySelector('[data-nav-loader]'),P=L&&L.querySelector('path'),raf=0,amp=1;
-function draw(){var t=Date.now()/1000,a=(.55+.12*Math.sin(t*2.1))*amp,ph=t*5,s='';for(var i=0;i<=60;i++){var e=Math.sin(Math.PI*i/60),y=100+a*70*e*Math.sin(i*.42+ph);s+=(i?'L':'M')+(i/60*1000).toFixed(1)+' '+y.toFixed(1)}P.setAttribute('d',s)}
+  <script>(function(d,w){var L=document.querySelector('[data-nav-loader]'),P=L&&L.querySelector('path'),raf=0,tm=0;
+function draw(){var t=Date.now()/1000,a=.55+.12*Math.sin(t*2.1),ph=t*5,s='';for(var i=0;i<=60;i++){var e=Math.sin(Math.PI*i/60),y=100+a*70*e*Math.sin(i*.42+ph);s+=(i?'L':'M')+(i/60*1000).toFixed(1)+' '+y.toFixed(1)}P.setAttribute('d',s)}
 function loop(){draw();raf=requestAnimationFrame(loop)}
-w.wrNavLoader={start:function(){if(!P||raf)return;L.classList.remove('is-out');amp=1;loop()},
-out:function(){return new Promise(function(res){if(!P||!raf)return res();var t0=performance.now();(function f(now){var k=Math.min(1,Math.max(0,now-t0)/250);amp=1-k*k*(3-2*k);if(k<1)requestAnimationFrame(f);else{L.classList.add('is-out');res()}})(t0)})},
-stop:function(){cancelAnimationFrame(raf);raf=0;amp=1;if(L)L.classList.remove('is-out')}};
-if(d.classList.contains('from-menu'))w.wrNavLoader.start()})(document.documentElement,window)</script>
+function stop(){clearTimeout(tm);cancelAnimationFrame(raf);raf=0;if(L)L.classList.remove('is-on','is-now')}
+w.wrNavLoader={start:function(now){if(!P)return;clearTimeout(tm);if(now){L.classList.add('is-now');requestAnimationFrame(function(){requestAnimationFrame(function(){L.classList.remove('is-now')})})}L.classList.add('is-on');if(!raf)loop()},
+out:function(){if(!P)return;L.classList.remove('is-on','is-now');clearTimeout(tm);tm=setTimeout(stop,300)},stop:stop}})(document.documentElement,window)</script>
   <script>(function(d,w){if(!d.classList.contains('from-menu'))return;
-var c=document.querySelector('[data-page-curtain]'),fill=c.querySelector('.page-curtain-fill'),edge=c.querySelector('.page-curtain-edge');
-function draw(y,a,ph){function v(k){return y+a*Math.sin(ph+k*1.9)}function e(k){return v(k).toFixed(2)}var m=(2*v(3)-v(2)).toFixed(2),cv='C83 '+e(1)+' 67 '+e(2)+' 50 '+e(3)+' C33 '+m+' 17 '+e(5)+' 0 '+e(6);fill.setAttribute('d','M0 0 L100 0 L100 '+e(0)+' '+cv+' Z');edge.setAttribute('d','M100 '+e(0)+' '+cv)}
+var c=document.querySelector('[data-page-curtain]'),fill=c.querySelector('.page-curtain-fill'),edge=c.querySelector('.page-curtain-edge'),L=w.wrNavLoader;
+function draw(y,a){function v(k){return y+a*Math.sin(1.6+k*1.9)}function e(k){return v(k).toFixed(2)}var m=(2*v(3)-v(2)).toFixed(2),cv='C83 '+e(1)+' 67 '+e(2)+' 50 '+e(3)+' C33 '+m+' 17 '+e(5)+' 0 '+e(6);fill.setAttribute('d','M0 0 L100 0 L100 '+e(0)+' '+cv+' Z');edge.setAttribute('d','M100 '+e(0)+' '+cv)}
 function wait(ms){return new Promise(function(r){setTimeout(r,ms)})}
+var fm=0;try{fm=+sessionStorage.getItem('wr_from_menu')}catch(e){}var el=Date.now()-fm;if(!(el>=0&&el<15000))el=0;
+var lifted=false,shown=false,tm=0;
+if(L){if(el>=250){L.start(true);shown=true}else tm=setTimeout(function(){if(!lifted){L.start();shown=true}},250-el)}
+var liftStart;w.wrCurtainLifting=new Promise(function(r){liftStart=r});
 w.wrCurtainLift=new Promise(function(done){
 var fonts=document.fonts?document.fonts.ready:Promise.resolve();
 var bg=new Promise(function(r){(function chk(){var b=document.querySelector('[data-bg]');if(!b||b.classList.contains('is-ready'))r();else requestAnimationFrame(chk)})()});
-Promise.all([wait(400),Promise.race([Promise.all([fonts,bg]),wait(1500)])]).then(function(){requestAnimationFrame(function(){requestAnimationFrame(function(){if(w.wrNavLoader)w.wrNavLoader.out();start()})})});
-function start(){var t0=performance.now();edge.style.opacity='.85';
-(function f(now){var s=Math.max(0,now-t0),t=Math.min(1,s/750),p=t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,a=s<320?8*Math.sin(s/320*Math.PI/2):s<720?8*Math.cos((s-320)/400*Math.PI/2):0;
-draw(112-126*p,a,3.2*(1-p));if(t<1)requestAnimationFrame(f);else{d.classList.remove('from-menu');if(w.wrNavLoader)w.wrNavLoader.stop();try{sessionStorage.removeItem('wr_from_menu')}catch(e){}done()}})(t0)}
+Promise.race([Promise.all([fonts,bg]),wait(Math.max(0,1200-el))]).then(function(){requestAnimationFrame(function(){requestAnimationFrame(start)})});
+function start(){lifted=true;clearTimeout(tm);if(shown&&L)L.out();d.classList.add('lifting');liftStart();var t0=performance.now();edge.style.opacity='.85';
+(function f(now){var t=Math.min(1,Math.max(0,now-t0)/550),p=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+draw(103-117*p,5*Math.sin(Math.PI*t));if(t<1)requestAnimationFrame(f);else{d.classList.remove('from-menu','lifting');if(L)L.stop();try{sessionStorage.removeItem('wr_from_menu')}catch(e){}done()}})(t0)}
 })})(document.documentElement,window)</script>
   <!-- Інтро: показується лише з html.wr-intro (див. скрипт у <head>), анімацію веде motion.js -->
   <div class="intro" data-intro>
@@ -229,17 +238,17 @@ draw(112-126*p,a,3.2*(1-p));if(t<1)requestAnimationFrame(f);else{d.classList.rem
         <ol class="menu-links" role="list">${navLinks}</ol>
         <div class="menu-faq-wrap"><a class="btn btn-glass btn-sm menu-faq" href="/faq" ${current === '/faq' ? raw('aria-current="page"') : ''}>FAQ</a></div>
       </div>
-      <!-- Низ меню — одна лінія: адреса — телефон — Telegram — «Записатися» (на телефоні — компактна група по центру) -->
-      <!-- Дві половини — точно під дві колонки пунктів меню: ліворуч адреса й телефон, праворуч Telegram і «Записатися»;
-           телефон і Telegram на однаковій відстані від центральної лінії — ряд симетричний за будь-якої довжини тексту.
-           На вузьких екранах половини «розчиняються» (display: contents) у компактну групу по центру -->
+      <!-- Низ меню — чотири пігулки в один ряд: адреса (Google Maps у новій вкладці) — телефон (дзвінок) — Telegram (чат) —
+           «Записатися». Дві половини з тим самим проміжком, що й між кнопками: ліва притиснута до центру праворуч, права —
+           ліворуч, тож телефон і Telegram стоять на однаковій відстані від центральної лінії меню за будь-якої довжини
+           адреси. На вузьких екранах половини «розчиняються» (display: contents) у компактну групу по центру -->
       <div class="menu-foot">
         <div class="menu-foot-half">
-          <p class="menu-contact menu-addr">м. ${String(c.city || '').split(',')[0].trim()}, ${c.address}</p>
-          <p class="menu-contact menu-phone"><a href="${telLink(c.phone)}">${c.phone}</a></p>
+          <a class="btn btn-glass menu-contact menu-addr" href="${mapsUrl(c)}" target="_blank" rel="noopener">м. ${String(c.city || '').split(',')[0].trim()}, ${c.address}${icon.arrowUp}</a>
+          <a class="btn btn-glass menu-contact menu-phone" href="${telLink(c.phone)}">${c.phone}</a>
         </div>
         <div class="menu-foot-half">
-          ${c.telegram ? html`<p class="menu-contact menu-tg"><a href="https://t.me/${c.telegram}" rel="noopener">Telegram @${c.telegram}</a></p>` : ''}
+          ${c.telegram ? html`<a class="btn btn-glass menu-contact menu-tg" href="https://t.me/${c.telegram}" rel="noopener"><span>Telegram<span class="menu-tg-nick">&nbsp;@${c.telegram}</span></span>${icon.arrowUp}</a>` : ''}
           <a class="btn btn-glass btn-sm menu-faq-mob" href="/faq" ${current === '/faq' ? raw('aria-current="page"') : ''}>FAQ</a>
           <a class="btn btn-neon menu-book" href="/book">Записатися${icon.arrow}</a>
         </div>

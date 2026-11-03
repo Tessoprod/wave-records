@@ -78,6 +78,12 @@ function smoothScroll() {
 
 /* ---------- Допоміжне ---------- */
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+// Перехід з меню: контент першого екрана з'являється м'якше — лише згасання і зсув до 16 px (без масок рядків),
+// щоб разом із підйомом шторки не було різких рухів. Решта сторінки (нижче екрана) — як завжди.
+const GENTLE = !reduceMotion && root.classList.contains('from-menu');
+const inFirstView = (el) => { const r = el.getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0; };
+const gentle = (el) => GENTLE && inFirstView(el);
+const GENTLE_Y = 16;
 const notInDialog = (el) => !el.closest('dialog, [hidden]');
 // Один раз при першій появі; якщо елемент уже вище екрана — анімація відбувається одразу
 const onceAt = (trigger, start = 'top 88%') => ({ trigger, start, once: true });
@@ -85,7 +91,8 @@ const onceAt = (trigger, start = 'top 88%') => ({ trigger, start, once: true });
 /* Проявити групу елементів каскадом, коли вони доїжджають до екрана */
 function cascade(items, { y = 40, x = 0, stagger = 0.08, onEnter } = {}) {
   if (!items.length) return;
-  gsap.set(items, { opacity: 0, y: reduceMotion ? 0 : y, x: reduceMotion ? 0 : x });
+  const cap = (v, el) => (gentle(el) ? Math.sign(v) * Math.min(Math.abs(v), GENTLE_Y) : v);
+  gsap.set(items, { opacity: 0, y: (i, el) => (reduceMotion ? 0 : cap(y, el)), x: (i, el) => (reduceMotion ? 0 : cap(x, el)) });
   ScrollTrigger.batch(items, {
     start: 'top 92%',
     once: true,
@@ -101,6 +108,10 @@ function cascade(items, { y = 40, x = 0, stagger = 0.08, onEnter } = {}) {
    pageTitle() — назва сторінки (перший h1), стартує першою; headings() — решта заголовків і лідів. */
 const titleEl = () => document.querySelector('main h1.h1');
 function splitLines(el, trigger = true) {
+  if (gentle(el)) {
+    gsap.fromTo(el, { opacity: 0, y: GENTLE_Y }, { opacity: 1, y: 0, duration: 0.8, ease: EASE, clearProps: 'transform' });
+    return;
+  }
   gsap.set(el, { opacity: 1 });
   // Рядки виїжджають знизу з маски; після анімації розмітка повертається до звичайної
   const split = SplitText.create(el, { type: 'lines', mask: 'lines' });
@@ -194,6 +205,13 @@ function servicesStage() {
   };
   const toCenterX = (i, el) => innerWidth / 2 - pos(el).x + (i - (items.length - 1) / 2) * 6;
   const toCenterY = (i, el) => innerHeight / 2 - pos(el).y + (i % 2 ? 5 : -5);
+  // Порожнє місце під картками всередині першого екрана (картки по центру екрана): біжучий рядок після нього
+  // підтягується вгору на цю величину (--stage-tail у site.css), щоб проміжки над і під рядком були рівні.
+  // Рахуємо перед кожним перерахунком ScrollTrigger (закріплення тоді знято — звичайне розташування)
+  const grid = svc.querySelector('.svc-grid');
+  const setTail = () => root.style.setProperty('--stage-tail', `${Math.max(0, Math.round(stage.getBoundingClientRect().bottom - grid.getBoundingClientRect().bottom))}px`);
+  setTail();
+  ScrollTrigger.addEventListener('refreshInit', setTail);
 
   // Довжина закріплення: BASE екрана — поява карток, PAUSE — «стопор»: картки вже на місцях і нерухомі
   const BASE = 1.3;
@@ -347,10 +365,27 @@ function steps() {
   const list = sec?.querySelector('.steps');
   if (!list) return;
   const items = [...list.children];
+  // Лінія — від центру першої точки до центру останньої: міряємо їх (на комп'ютері по горизонталі, на телефоні
+  // по вертикалі) і передаємо в CSS; при зміні розміру — заново
+  const dots = items.map((li) => li.querySelector('.step-dot')).filter(Boolean);
+  const measure = () => {
+    if (dots.length < 2) return;
+    const r = list.getBoundingClientRect();
+    const a = dots[0].getBoundingClientRect();
+    const b = dots[dots.length - 1].getBoundingClientRect();
+    const vertical = Math.abs(b.left - a.left) < 1;
+    const from = vertical ? a.top + a.height / 2 - r.top : a.left + a.width / 2 - r.left;
+    const to = vertical ? r.bottom - (b.top + b.height / 2) : r.right - (b.left + b.width / 2);
+    list.style.setProperty('--steps-from', `${from.toFixed(1)}px`);
+    list.style.setProperty('--steps-to', `${to.toFixed(1)}px`);
+  };
+  measure();
+  if ('ResizeObserver' in window) new ResizeObserver(measure).observe(list);
   let current = -1;
+  // Крок підсвічується, щойно лінія доходить до його точки: точки стоять на 0, 1/4, … 1 довжини лінії
   const setStep = (p) => {
     list.style.setProperty('--steps-p', p.toFixed(3));
-    const idx = Math.max(0, Math.min(items.length - 1, Math.floor(p * items.length)));
+    const idx = Math.max(0, Math.min(items.length - 1, Math.floor(p * (items.length - 1) + 0.001)));
     if (idx === current) return;
     current = idx;
     items.forEach((li, i) => {
@@ -772,6 +807,10 @@ function heroIntro(still = false) {
   const rest = intro.querySelectorAll('.hero-l2, .hero-sub, .hero-ctas');
   {
     show();
+    if (gentle(intro)) {
+      gsap.from([line1, ...rest].filter(Boolean), { y: GENTLE_Y, opacity: 0, duration: 0.8, ease: EASE, stagger: 0.06, clearProps: 'transform' });
+      return;
+    }
     const split = SplitText && line1 ? SplitText.create(line1, { type: 'chars', mask: 'chars' }) : null;
     const tl = gsap.timeline({ defaults: { ease: EASE }, onComplete: () => split?.revert() });
     if (split) tl.from(split.chars, { yPercent: 110, duration: 1.2, stagger: 0.035 });
@@ -900,7 +939,13 @@ function homeLinks() {
 async function entrance() {
   await revealed;
   if (root.classList.contains('wr-intro')) return motion.introDone;
-  if (root.classList.contains('from-menu')) return curtainLift();
+  if (root.classList.contains('from-menu')) {
+    // Контент починає з'являтися вже під час підйому шторки (за ~0,1 с після його початку), а не після нього
+    const lifted = curtainLift();
+    if (!window.wrCurtainLifting) return lifted;
+    await window.wrCurtainLifting;
+    return new Promise((r) => setTimeout(r, 100));
+  }
   const vt = window.wrViewTransition;
   if (vt) { try { await vt.finished; } catch { /* перехід пропущено */ } }
   return undefined;
@@ -915,7 +960,7 @@ async function conductor() {
   heroIntro();
   pageTitle();
   // Решта — слідом за назвою, щоб рух був шаруватим
-  await new Promise((r) => setTimeout(r, titleEl() ? 300 : 120));
+  await new Promise((r) => setTimeout(r, GENTLE ? 60 : titleEl() ? 300 : 120));
   try { headings(); } catch (err) { console.error(err); showAll(); }
   steps();
   blocks();
