@@ -677,7 +677,7 @@
 
   /* ---------- Питання та відповіді (/faq) ----------
      Основа — нативні details/summary: без JS усе відкривається й закривається саме.
-     Тут: у межах групи відкрите одне питання; aria-expanded на summary; хеш в URL (#installments)
+     Тут: на всій сторінці (і в блоці на головній) відкрите лише одне питання; aria-expanded на summary; хеш в URL (#installments)
      відкриває й прокручує до питання, а відкриття оновлює хеш без стрибка (history.replaceState);
      підсвітка поточної групи в колонці ліворуч (на телефоні — у ряді чіпсів).
      Плавне розгортання дає motion.js (wrMotion.faqAnim); без нього — миттєво. */
@@ -694,11 +694,44 @@
     // Ексклюзивність робимо самі (з анімацією закриття сусіда), тож нативне name="" прибираємо
     items.forEach((d) => { d.removeAttribute('name'); sync(d); });
 
+    // Тримати елемент на тому самому місці екрана, поки вище змінюється висота (закриття іншого питання, ~0,6 с).
+    // Вирівнюємо в тому ж циклі кадрів GSAP, одразу після того, як анімація закриття змінила висоту (без відставання)
+    function keepInPlace(el, top) {
+      const gsap = window.wrMotion?.gsap;
+      const t0 = performance.now();
+      // Вбудоване «прив'язування прокрутки» браузера на цей час вимикаємо — інакше вирівнюють обоє і на кадр перестрибує
+      const rootStyle = document.documentElement.style;
+      rootStyle.overflowAnchor = 'none';
+      setTimeout(() => rootStyle.removeProperty('overflow-anchor'), 800);
+      const fix = () => {
+        const diff = el.getBoundingClientRect().top - top;
+        if (Math.abs(diff) > 0.5) {
+          const lenis = window.wrMotion?.lenis;
+          if (lenis) lenis.scrollTo(lenis.scroll + diff, { immediate: true, force: true });
+          else scrollBy(0, diff);
+        }
+        return performance.now() - t0 < 750;
+      };
+      if (gsap) { const tick = () => { if (!fix()) gsap.ticker.remove(tick); }; gsap.ticker.add(tick); }
+      else (function step() { if (fix()) requestAnimationFrame(step); })();
+      // Остаточне закриття (details стає закритим) змінює висоту поза анімацією — ResizeObserver спрацьовує після
+      // перерахунку макета, але до відмальовки, тож і цей кадр вирівнюється
+      if ('ResizeObserver' in window) {
+        const ro = new ResizeObserver(() => { if (!fix()) ro.disconnect(); });
+        ro.observe(faq);
+        setTimeout(() => ro.disconnect(), 800);
+      }
+    }
     async function setItem(d, open, { animate = true, hash = true } = {}) {
       if (open === shown(d)) return;
       const anim = animate && !reduceMotion ? window.wrMotion?.faqAnim : null;
       if (open) {
-        $$('[data-faq-item]', d.closest('[data-faq-group]') || faq).forEach((o) => { if (o !== d && shown(o)) setItem(o, false, { animate, hash: false }); });
+        // На всій сторінці відкрите лише одне питання: решта закривається. Якщо закривається питання вище, сторінка
+        // «з'їжджала» б угору й натиснуте питання тікало б — поки воно закривається, тримаємо натиснуте на місці
+        const others = items.filter((o) => o !== d && shown(o));
+        const above = others.some((o) => o.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_FOLLOWING);
+        others.forEach((o) => setItem(o, false, { animate, hash: false }));
+        if (above) keepInPlace(d, d.getBoundingClientRect().top);
         d.classList.remove('is-closing');
         d.open = true;
         sync(d);
@@ -726,7 +759,7 @@
       // Браузер може відкрити details сам (пошук на сторінці) — тримаємо стан і сусідів у порядку
       d.addEventListener('toggle', () => {
         if (d.open && !d.classList.contains('is-closing')) {
-          $$('[data-faq-item]', d.closest('[data-faq-group]') || faq).forEach((o) => { if (o !== d && o.open && !o.classList.contains('is-closing')) { o.open = false; sync(o); } });
+          items.forEach((o) => { if (o !== d && o.open && !o.classList.contains('is-closing')) { o.open = false; sync(o); } });
         }
         sync(d);
       });
