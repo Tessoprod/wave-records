@@ -743,6 +743,10 @@ html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 
 .about-intro { padding-top: calc(var(--header-h) + clamp(56px, 9vw, 120px)); }
 .about-title { max-width: 15ch; }
+/* Слова в назві «Про студію» не розриваються переносом: найдовше («допомагаємо», ≈ 8,4 em) має вміщатися з запасом —
+   на вузьких екранах розмір рахується від ширини рядка (≈ 89 % ширини), а не впритул */
+.h1.about-title { -webkit-hyphens: manual; hyphens: manual; overflow-wrap: normal; }
+@media (max-width: 860px) { .h1.about-title { font-size: min(44px, calc((100vw - 2 * var(--gutter)) / 9.4)); } }
 .about-intro .page-lead { margin-top: 28px; }
 .about-hero-photo { margin: clamp(40px, 6vw, 72px) 0 0; border-radius: var(--r-xl); overflow: hidden; aspect-ratio: 16 / 8; background: var(--surface); }
 .about-hero-photo img, .about-hero-photo .fragment { width: 100%; height: 100%; object-fit: cover; aspect-ratio: auto; }
