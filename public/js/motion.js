@@ -308,7 +308,8 @@ function magnetTo(target, range, duration) {
    прокрутка м'яко примагнічується до її початку. Без prefers-reduced-motion. */
 function servicesPause() {
   const svc = document.querySelector('[data-stage] .svc-section');
-  if (!svc || reduceMotion) return;
+  // На телефоні (до 860 px) — без паузи й примагнічування: картки з'являються, сторінка гортається далі звичайно
+  if (!svc || reduceMotion || matchMedia('(max-width: 860px)').matches) return;
   const top = () => (document.querySelector('.site-header')?.offsetHeight || 0) + 8;
   const st = ScrollTrigger.create({
     trigger: svc,
@@ -538,6 +539,24 @@ function logoEq() {
       else l.st.forEach((st) => { st.grow = 1; });
     }
     if (finePointer) l.logo.addEventListener('mouseenter', () => wave(l));
+    // Сенсорний екран: дотик до логотипа в шапці програє ту саму хвилю, що наведення мишею, і лише через ~250 мс —
+    // перехід на головну (чи плавна прокрутка нагору, якщо вже на ній), щоб хвилю було видно
+    if (!finePointer && !inFooter) {
+      l.logo.addEventListener('click', (e) => {
+        if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
+        e.preventDefault();
+        e.stopPropagation(); // homeLinks() не прокручує одразу — зробимо це самі після хвилі
+        wave(l);
+        const href = l.logo.href;
+        const samePage = l.logo.pathname === location.pathname;
+        setTimeout(() => {
+          if (!samePage) { location.assign(href); return; }
+          if (document.body.classList.contains('menu-open')) document.querySelector('[data-menu-toggle]')?.click();
+          if (motion.lenis) motion.lenis.scrollTo(0, { duration: 1.2 });
+          else scrollTo({ top: 0, behavior: 'smooth' });
+        }, 250);
+      });
+    }
     l.logo.addEventListener('focus', () => { if (l.logo.matches(':focus-visible')) wave(l); });
   });
 
@@ -811,7 +830,10 @@ function heroIntro(still = false) {
       gsap.from([line1, ...rest].filter(Boolean), { y: GENTLE_Y, opacity: 0, duration: 0.8, ease: EASE, stagger: 0.06, clearProps: 'transform' });
       return;
     }
-    const split = SplitText && line1 ? SplitText.create(line1, { type: 'chars', mask: 'chars' }) : null;
+    // На телефоні рядок не ділимо на літери: при поділі змінюється кернінг і ширина рядка (~2 px), а після анімації
+    // (split.revert) центрований рядок «стрибав» на кілька пікселів. Там рядок виїжджає цілим
+    const phone = matchMedia('(max-width: 860px)').matches;
+    const split = SplitText && line1 && !phone ? SplitText.create(line1, { type: 'chars', mask: 'chars' }) : null;
     const tl = gsap.timeline({ defaults: { ease: EASE }, onComplete: () => split?.revert() });
     if (split) tl.from(split.chars, { yPercent: 110, duration: 1.2, stagger: 0.035 });
     else if (line1) tl.from(line1, { y: 40, opacity: 0, duration: 1.1 });

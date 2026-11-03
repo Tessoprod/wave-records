@@ -10,6 +10,7 @@
 // --height=N — висота екрана, за замовчуванням 900 (для ширини < 800 — 844).
 // --cookies  — не ховати банер cookies.
 // --tag=X    — префікс назви файлу: _shots/X-about-390.png.
+// --reduced  — браузер з --force-prefers-reduced-motion (без анімацій: стабільні кадри для порівняння «до/після»).
 // --hover=S  — навести мишу на перший елемент за CSS-селектором S (стан наведення); з --full не поєднується.
 // --intro    — показати інтро першого входу (за замовчуванням воно пропускається, щоб знімати саму сторінку).
 import fs from 'node:fs';
@@ -47,7 +48,7 @@ if (!browser) { console.error('Не знайдено Microsoft Edge або Googl
 const profile = path.join(OUT, '.profile');
 fs.rmSync(profile, { recursive: true, force: true });
 fs.mkdirSync(path.join(profile, 'tmp'), { recursive: true });
-const proc = spawn(browser, ['--headless=new', '--hide-scrollbars', '--disable-gpu', '--no-first-run',
+const proc = spawn(browser, ['--headless=new', '--hide-scrollbars', '--disable-gpu', '--no-first-run', ...(flag('reduced') ? ['--force-prefers-reduced-motion'] : []),
   `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'],
   // TEMP теж усередині профілю: службові папки браузера (scoped_dir…) не лишаються в %TEMP% і видаляються разом із ним
   { stdio: 'ignore', env: { ...process.env, TEMP: path.join(profile, 'tmp'), TMP: path.join(profile, 'tmp') } });

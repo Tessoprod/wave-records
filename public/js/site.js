@@ -3,6 +3,13 @@
   'use strict';
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  /* Видимий фокус — лише при навігації з клавіатури. Клас kbd-nav на <html>: ставить Tab чи стрілки, знімає дотик чи
+     клік. На телефонах і сенсорних екранах без нього контур фокусу не малюється (site.css), а програмне фокусування
+     (пастка фокусу в меню, повернення фокусу) — без прокрутки й без видимого контуру (quietFocus) */
+  const kbdKeys = new Set(['Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+  addEventListener('keydown', (e) => { if (kbdKeys.has(e.key)) document.documentElement.classList.add('kbd-nav'); }, true);
+  addEventListener('pointerdown', () => document.documentElement.classList.remove('kbd-nav'), true);
+  const quietFocus = () => ({ preventScroll: true, focusVisible: document.documentElement.classList.contains('kbd-nav') });
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const fmt = (sec) => {
     const s = Math.max(0, Math.floor(sec || 0));
@@ -90,8 +97,15 @@
   if (heroTitle) {
     fitHero();
     if (document.fonts) document.fonts.ready.then(fitHero);
+    // Повторно — лише коли справді змінилась ширина (на телефоні resize приходить і від появи/зникнення адресного
+    // рядка — тоді перерахунок посеред анімації давав інший розмір, і текст першого екрана «скакав»)
     let fitT;
-    addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(fitHero, 100); });
+    let fitW = innerWidth;
+    addEventListener('resize', () => {
+      if (Math.abs(innerWidth - fitW) < 3) return;
+      fitW = innerWidth;
+      clearTimeout(fitT); fitT = setTimeout(fitHero, 100);
+    });
   }
 
   const menu = $('[data-menu]');
@@ -112,12 +126,12 @@
         menu.hidden = false;
         if (anim) await anim(true);
         else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => { menu.classList.add('is-open'); r(); })));
-        $('.menu-links a', menu)?.focus({ preventScroll: true });
+        $('.menu-links a', menu)?.focus(quietFocus());
       } else {
         if (anim) await anim(false);
         else { menu.classList.remove('is-open'); await new Promise((r) => setTimeout(r, reduceMotion ? 0 : 300)); }
         menu.hidden = true;
-        if (menu.contains(document.activeElement) || document.activeElement === document.body) toggle.focus({ preventScroll: true });
+        if (menu.contains(document.activeElement) || document.activeElement === document.body) toggle.focus(quietFocus());
       }
     } finally {
       menuBusy = false;
@@ -162,14 +176,14 @@
   });
   document.addEventListener('keydown', (e) => {
     if (!isOpen()) return;
-    if (e.key === 'Escape') { setMenu(false); toggle.focus(); return; }
+    if (e.key === 'Escape') { setMenu(false); toggle.focus({ preventScroll: true }); return; }
     // Поки меню відкрите, фокус ходить по колу: пункти меню, контакти, «Записатися» і кнопка «Закрити»
     if (e.key === 'Tab') {
       const items = [...$$('a, button', menu), toggle].filter((el) => !el.hidden && el.offsetParent !== null);
       const i = items.indexOf(document.activeElement);
       const next = i === -1 ? 0 : (i + (e.shiftKey ? -1 : 1) + items.length) % items.length;
       e.preventDefault();
-      items[next].focus();
+      items[next].focus({ preventScroll: true });
     }
   });
 
@@ -220,6 +234,18 @@
   }
   const scheduleGlass = () => { if (!glassRaf) glassRaf = requestAnimationFrame(glassFrame); };
 
+  // Телефони й планшети (сенсорний екран): полегшений відблиск — смуга світла один раз пробігає по скляному блоку,
+  // коли він з'являється на екрані (клас is-sheen → CSS-анімація лише transform і opacity), без обробки прокрутки
+  if (!reduceMotion && !finePointer && 'IntersectionObserver' in window) {
+    const sheenIO = new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        if (!en.isIntersecting) continue;
+        en.target.classList.add('is-sheen');
+        sheenIO.unobserve(en.target);
+      }
+    }, { threshold: 0.35 });
+    $$('main .glass:not(.btn-glass):not(.faq-nav-link)').forEach((el) => sheenIO.observe(el));
+  }
   // Смуга світла, що рухається при прокрутці, — лише на комп'ютерах; на телефонах скло статичне й легке
   if (!reduceMotion && finePointer) {
     const glassIO = 'IntersectionObserver' in window && new IntersectionObserver((entries) => {

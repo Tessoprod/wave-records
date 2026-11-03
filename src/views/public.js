@@ -385,7 +385,7 @@ export function bookPage({ services, preselect }) {
         <div>
           <p class="info-title">${info.address}</p>
           <p class="muted">${info.address_note}</p>
-          <a class="text-link" href="${mapUrl}" rel="noopener" target="_blank">Відкрити на мапі${icon.arrowUp}</a>
+          <a class="text-link info-map" href="${mapUrl}" rel="noopener" target="_blank">Відкрити на мапі${icon.arrowUp}</a>
         </div>
       </div>
       <div class="info-card glass glass-card">
@@ -521,7 +521,7 @@ export function staticBookPage({ booking }) {
         <div>
           <p class="info-title">${info.address}</p>
           <p class="muted">${info.address_note}</p>
-          <a class="text-link" href="${mapUrl}" rel="noopener" target="_blank">Відкрити на мапі${icon.arrowUp}</a>
+          <a class="text-link info-map" href="${mapUrl}" rel="noopener" target="_blank">Відкрити на мапі${icon.arrowUp}</a>
         </div>
       </div>
       <div class="info-card glass glass-card">
