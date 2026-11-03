@@ -756,6 +756,7 @@
       index = i;
       img.src = photos[i].src;
       img.alt = photos[i].alt;
+      resetZoom(); // нове фото — без зуму
       sync();
     }
     // Упор: далі фото немає — фото трохи зсувається в бік спроби й пружно повертається
@@ -800,13 +801,83 @@
     // Клік повз фото (по затемненню) — закрити
     lightbox.addEventListener('click', (e) => { if (e.target === lightbox || e.target === stage) lightbox.close(); });
 
-    // Свайп (палець чи стилус; мишею — кліки й стрілки)
+    // Дотики: свайп (гортання й закриття), щипок двома пальцями (зум 1–4×), перетягування збільшеного фото одним
+    // пальцем, подвійний дотик — зум 2,5× у точці дотику / назад. Поки фото збільшене, свайп не гортає.
+    // Зум — transform на самому <img> (translate + scale), рамка й кнопка закриття лишаються на місці.
     let drag = null;
+    const touches = new Map();
+    const z = { s: 1, x: 0, y: 0 };
+    let pinch = null;
+    let pan = null;
+    let lastTap = { t: 0, x: 0, y: 0 };
+    const MAX_ZOOM = 4;
+    const applyZoom = () => { img.style.transform = z.s === 1 && !z.x && !z.y ? '' : `translate3d(${z.x}px,${z.y}px,0) scale(${z.s})`; };
+    // Межі зсуву: збільшене фото не відходить краями всередину екрана
+    const limits = (s) => {
+      const r = frame.getBoundingClientRect();
+      return { x: Math.max(0, (r.width * s - innerWidth) / 2), y: Math.max(0, (r.height * s - innerHeight) / 2) };
+    };
+    const clampZoom = (animate = true) => {
+      const from = { ...z };
+      if (z.s < 1) { z.s = 1; }
+      if (z.s > MAX_ZOOM) z.s = MAX_ZOOM;
+      if (z.s === 1) { z.x = 0; z.y = 0; } else {
+        const l = limits(z.s);
+        z.x = Math.max(-l.x, Math.min(l.x, z.x));
+        z.y = Math.max(-l.y, Math.min(l.y, z.y));
+      }
+      if (animate && !reduceMotion && (from.s !== z.s || from.x !== z.x || from.y !== z.y)) {
+        img.animate([{ transform: `translate3d(${from.x}px,${from.y}px,0) scale(${from.s})` }, { transform: `translate3d(${z.x}px,${z.y}px,0) scale(${z.s})` }], { duration: 300, easing: 'cubic-bezier(.2, .9, .3, 1)' });
+      }
+      applyZoom();
+    };
+    const resetZoom = () => { z.s = 1; z.x = 0; z.y = 0; pinch = null; pan = null; img.getAnimations().forEach((a) => a.cancel()); applyZoom(); };
+    // Точка на екрані → зсув відносно центру рамки (центр незбільшеного фото)
+    const rel = (x, y) => { const r = frame.getBoundingClientRect(); return { x: x - (r.left + r.width / 2), y: y - (r.top + r.height / 2) }; };
+    // Зум до масштабу s так, щоб точка p (відносно центру) лишалась під пальцем
+    const zoomAt = (s, p) => { const k = s / z.s; z.x = p.x - (p.x - z.x) * k; z.y = p.y - (p.y - z.y) * k; z.s = s; };
+
     stage.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse' || busy || e.target.closest('button')) return;
+      if (e.pointerType === 'mouse' || e.target.closest('button')) return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        // Другий палець — щипок; звичайний свайп скасовуємо
+        if (drag) { frame.style.transform = ''; frame.style.opacity = ''; drag = null; }
+        pan = null;
+        const [a, b] = [...touches.values()];
+        pinch = { d: Math.hypot(b.x - a.x, b.y - a.y) || 1, s: z.s, m: rel((a.x + b.x) / 2, (a.y + b.y) / 2), x: z.x, y: z.y };
+        img.getAnimations().forEach((an) => an.cancel());
+        try { stage.setPointerCapture(e.pointerId); } catch { /* */ }
+        return;
+      }
+      if (touches.size > 2) return;
+      if (z.s > 1) { pan = { id: e.pointerId, x: e.clientX, y: e.clientY, zx: z.x, zy: z.y }; try { stage.setPointerCapture(e.pointerId); } catch { /* */ } return; }
+      if (busy) return;
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), axis: '', dx: 0, dy: 0 };
     });
     stage.addEventListener('pointermove', (e) => {
+      if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && touches.size >= 2) {
+        const [a, b] = [...touches.values()];
+        const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        let s = pinch.s * d / pinch.d;
+        // За межами 1–4× — з опором
+        if (s > MAX_ZOOM) s = MAX_ZOOM + (s - MAX_ZOOM) * 0.25;
+        if (s < 1) s = 1 - (1 - s) * 0.4;
+        const m = rel((a.x + b.x) / 2, (a.y + b.y) / 2);
+        // Масштаб навколо початкової точки між пальцями + зсув, якщо пальці рухаються разом
+        z.x = pinch.m.x - (pinch.m.x - pinch.x) * (s / pinch.s) + (m.x - pinch.m.x);
+        z.y = pinch.m.y - (pinch.m.y - pinch.y) * (s / pinch.s) + (m.y - pinch.m.y);
+        z.s = s;
+        applyZoom();
+        return;
+      }
+      if (pan && e.pointerId === pan.id) {
+        z.x = pan.zx + (e.clientX - pan.x);
+        z.y = pan.zy + (e.clientY - pan.y);
+        applyZoom();
+        return;
+      }
       if (!drag || e.pointerId !== drag.id) return;
       const dx = e.clientX - drag.x;
       const dy = e.clientY - drag.y;
@@ -829,12 +900,31 @@
       }
     });
     const endDrag = (e) => {
+      const tap = touches.get(e.pointerId);
+      touches.delete(e.pointerId);
+      if (pinch) {
+        if (touches.size < 2) {
+          pinch = null;
+          clampZoom();
+          // Лишився один палець на збільшеному фото — продовжуємо перетягувати ним
+          if (touches.size === 1 && z.s > 1) { const [id, p] = [...touches.entries()][0]; pan = { id, x: p.x, y: p.y, zx: z.x, zy: z.y }; }
+        }
+        return;
+      }
+      if (pan && e.pointerId === pan.id) {
+        const moved = Math.hypot(e.clientX - pan.x, e.clientY - pan.y);
+        pan = null;
+        clampZoom();
+        if (moved < 10 && tap) checkDoubleTap(e);
+        return;
+      }
       if (!drag || e.pointerId !== drag.id) return;
       const d = drag;
       drag = null;
       const dt = Math.max(1, performance.now() - d.t);
       frame.style.transform = '';
       frame.style.opacity = '';
+      if (!d.axis) { checkDoubleTap(e); return; }
       if (d.axis === 'x') {
         const dir = d.dx < 0 ? 1 : -1;
         const edge = (dir < 0 && index === 0) || (dir > 0 && index === photos.length - 1);
@@ -849,8 +939,23 @@
         if (y) anim([{ transform: `translate3d(0,${y}px,0)` }, { transform: 'translate3d(0,0,0)' }], { duration: 380, easing: 'cubic-bezier(.2, 1.2, .35, 1)' }).then(clear);
       }
     };
+    // Подвійний дотик по фото: збільшити в 2,5 раза в цій точці або повернути як було
+    function checkDoubleTap(e) {
+      const r = img.getBoundingClientRect(); // ціль події після захоплення — сцена, тож перевіряємо точку
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { lastTap.t = 0; return; }
+      const now = performance.now();
+      if (now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+        lastTap.t = 0;
+        if (z.s > 1) { z.s = 1; z.x = 0; z.y = 0; } else zoomAt(2.5, rel(e.clientX, e.clientY));
+        const from = img.style.transform || 'none';
+        clampZoom(false);
+        if (!reduceMotion) img.animate([{ transform: from }, { transform: img.style.transform || 'none' }], { duration: 300, easing: 'cubic-bezier(.2, .9, .3, 1)' });
+        return;
+      }
+      lastTap = { t: now, x: e.clientX, y: e.clientY };
+    }
     stage.addEventListener('pointerup', endDrag);
     stage.addEventListener('pointercancel', endDrag);
-    lightbox.addEventListener('close', () => { clear(); frame.style.transform = ''; frame.style.opacity = ''; busy = false; drag = null; });
+    lightbox.addEventListener('close', () => { clear(); frame.style.transform = ''; frame.style.opacity = ''; busy = false; drag = null; touches.clear(); resetZoom(); });
   }
 })();
