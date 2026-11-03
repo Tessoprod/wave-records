@@ -1057,14 +1057,15 @@ html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 .mini-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--white); border: 0; box-shadow: 0 0 0 3px rgba(var(--pink-rgb), .25); }
 .mini-range:hover::-webkit-slider-thumb { transform: scale(1.15); }
 .mini-range:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 999px; }
-/* Перехід до треку з міні-плеєра: рядок коротко підсвічується (рамка й світіння — лише opacity) */
-.track { position: relative; }
-.track.is-flash::after {
-  content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
-  border: 1px solid rgba(var(--pink-rgb), .6); box-shadow: 0 0 26px rgba(var(--pink-rgb), .25), inset 0 0 18px rgba(var(--pink-rgb), .1);
-  animation: track-flash 1.4s cubic-bezier(.45, 0, .55, 1) both;
+/* Картка треку: клік по порожньому місцю вмикає чи ставить на паузу (site.js), тож курсор — «рука».
+   Перехід до треку з міні-плеєра: картка коротко хитається (Web Animations, лише transform) і спалахує неоновий
+   контур .track-glow (створює site.js; лише opacity) */
+.track { position: relative; cursor: pointer; }
+.track-glow {
+  position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; opacity: 0;
+  border: 1px solid rgba(var(--pink-rgb), .55);
+  box-shadow: 0 0 22px rgba(var(--pink-rgb), .22), 0 0 34px rgba(var(--cyan-rgb), .12), inset 0 0 16px rgba(var(--pink-rgb), .08);
 }
-@keyframes track-flash { 0% { opacity: 0; } 20%, 55% { opacity: 1; } 100% { opacity: 0; } }
 .mini-title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-time { font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .mini-meter { height: 32px; gap: 2px; }

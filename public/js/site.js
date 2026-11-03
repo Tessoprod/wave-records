@@ -482,6 +482,14 @@
 
   tracks.forEach((el) => {
     $('.track-play', el).addEventListener("click", () => togglePlay(el));
+    // Клік чи тап по порожньому місцю картки — те саме, що кнопка play. Інтерактивні елементи (кнопка, хвиля-шкала,
+    // посилання, час) не дублюють дію; виділення тексту теж нічого не вмикає. Подія click (не touchstart): прокрутка
+    // пальцем по картці кліку не дає. Фокус картка не отримує — для клавіатури лишається кнопка play
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('button, a, input, select, textarea, label, .track-wave, .track-time, [role="slider"]')) return;
+      if (String(window.getSelection?.() || '').trim()) return;
+      togglePlay(el);
+    });
     const wave = $('.track-wave', el);
     let dragging = false;
     const ratioAt = (e) => { const r = wave.getBoundingClientRect(); return (e.clientX - r.left) / r.width; };
@@ -560,14 +568,53 @@
   if (mini) {
     $('[data-mini-toggle]', mini).addEventListener('click', () => { if (current) togglePlay(current); });
     // Клік по бару (окрім кнопок і гучності) чи кнопка «Перейти до треку» — плавно до рядка треку (з відступом під
-    // шапку: Lenis і браузер беруть його зі scroll-padding-top), рядок коротко підсвічується
-    const flash = (el) => { el.classList.remove('is-flash'); void el.offsetWidth; el.classList.add('is-flash'); setTimeout(() => el.classList.remove('is-flash'), 1500); };
+    // шапку), а коли прокрутка справді закінчилась — картка делікатно хитається по горизонталі (лише transform:
+    // 4 загасаючі коливання до 5 px, ~500 мс) з ледь помітним неоновим контуром, що згасає разом із рухом.
+    // Картка вже на екрані — одразу. Повторний клік перезапускає анімацію (попередня скасовується).
+    // prefers-reduced-motion — лише м'який спалах контуру. Web Animations: не залежать від CSS-правила reduced-motion.
+    const nudge = (el) => {
+      el.getAnimations().forEach((a) => { if (a.id === 'track-shake') a.cancel(); });
+      let glow = $('.track-glow', el);
+      if (!glow) { glow = document.createElement('span'); glow.className = 'track-glow'; glow.setAttribute('aria-hidden', 'true'); el.appendChild(glow); }
+      glow.getAnimations().forEach((a) => a.cancel());
+      glow.animate([{ opacity: 0 }, { opacity: 1, offset: 0.18 }, { opacity: 0 }], { duration: reduceMotion ? 900 : 540, easing: 'ease-out' });
+      if (reduceMotion) return;
+      const shake = el.animate([
+        { transform: 'translate3d(0,0,0)' },
+        { transform: 'translate3d(-5px,0,0)', offset: 0.14 },
+        { transform: 'translate3d(4px,0,0)', offset: 0.36 },
+        { transform: 'translate3d(-2.5px,0,0)', offset: 0.58 },
+        { transform: 'translate3d(1px,0,0)', offset: 0.8 },
+        { transform: 'translate3d(0,0,0)' },
+      ], { duration: 500, easing: 'cubic-bezier(.36, .07, .19, .97)' });
+      shake.id = 'track-shake';
+    };
+    // Картка повністю видна (нижче шапки й над міні-плеєром)?
+    const inView = (el) => {
+      const r = el.getBoundingClientRect();
+      const top = ($('.site-header')?.getBoundingClientRect().bottom || 0) + 4;
+      const bottom = mini.hidden ? innerHeight : mini.getBoundingClientRect().top - 4;
+      return r.top >= top && r.bottom <= bottom;
+    };
+    let goToken = 0;
     const goToTrack = () => {
       if (!current) return;
       const el = current;
+      const token = ++goToken; // новий клік скасовує очікування попереднього
+      const done = () => { if (token === goToken) nudge(el); };
+      if (inView(el)) { done(); return; }
       const lenis = window.wrMotion?.lenis;
-      if (lenis) lenis.scrollTo(el, { offset: -16, duration: 1, onComplete: () => flash(el) });
-      else { el.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' }); setTimeout(() => flash(el), reduceMotion ? 0 : 650); }
+      if (lenis) { lenis.scrollTo(el, { offset: -16, duration: 1, onComplete: done }); return; }
+      // Без Lenis: прокрутка браузера — чекаємо, поки картка з'явиться в зоні видимості, а прокрутка зупиниться
+      el.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+      const io = new IntersectionObserver(([en]) => {
+        if (!en.isIntersecting) return;
+        io.disconnect();
+        let last = scrollY;
+        let still = 0;
+        (function wait() { if (token !== goToken) return; still = scrollY === last ? still + 1 : 0; last = scrollY; if (still >= 3) done(); else requestAnimationFrame(wait); })();
+      }, { threshold: 0.9 });
+      io.observe(el);
     };
     mini.addEventListener('click', (e) => {
       if (e.target.closest('[data-mini-go]') || !e.target.closest('button, input, [data-mini-vol]')) goToTrack();
