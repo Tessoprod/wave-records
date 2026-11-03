@@ -1060,7 +1060,10 @@ html.wr-anim .timeline { --tl-p: 0; }
   box-shadow: 0 0 12px rgba(var(--pink-rgb), .35);
   transform-origin: 0 50%; transform: scaleX(var(--steps-p, 1));
 }
-.step { transition: opacity .35s var(--ease); }
+/* Притухають лише номер і назва неактивного кроку, а не весь крок: прозорість на .step робила з нього окремий шар,
+   нижчий за лінію, — лінія малювалась поверх кола (і крізь його напівпрозору основу), а коли крок ставав активним,
+   коло «вистрибувало» наверх і лінія різко зникала. Коло завжди непрозоре й над лінією та світінням */
+.step .num, .step .step-title { transition: opacity .35s var(--ease); }
 .step-dot { transition: box-shadow .4s var(--ease); }
 /* Голова лінії — м'яке світіння, що рухається разом із нею (лише transform), під колами; наприкінці згасає */
 .steps-head {
@@ -1070,7 +1073,7 @@ html.wr-anim .timeline { --tl-p: 0; }
 }
 .step-title { text-shadow: 0 2px 24px rgba(17, 17, 17, .7); }
 /* Неактивні кроки приглушені, але текст лишається контрастним (≈ 4.9:1, WCAG AA) */
-html.wr-anim .step:not(.is-on) { opacity: .5; }
+html.wr-anim .step:not(.is-on) :is(.num, .step-title) { opacity: .5; }
 html.wr-anim .step:first-child:not(.is-on) .step-dot { box-shadow: none; }
 .step.is-current .step-dot { box-shadow: 0 0 22px rgba(var(--pink-rgb), .35); }
 

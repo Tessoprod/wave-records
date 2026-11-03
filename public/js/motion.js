@@ -368,21 +368,21 @@ function steps() {
   const items = [...list.children];
   const dots = items.map((li) => li.querySelector('.step-dot')).filter(Boolean);
   if (dots.length < 2) return;
-  /* Лінія — від центру першої точки до центру останньої (на комп'ютері по горизонталі, на телефоні по вертикалі).
-     Рух веде «голова» лінії h — від лівого (верхнього) краю першого кола до правого (нижнього) краю останнього:
-     коло заливається рівно тоді, коли голова проходить крізь нього (--f від 0 до 1, з того боку, звідки прийшла
-     лінія), лінія тягнеться під колами без розривів і зупиняється в центрі останнього, м'яке світіння голови
-     (.steps-head) згасає наприкінці. Номер і назва кроку підсвічуються разом із початком заливки його кола.
-     Анімуються лише transform, opacity і clip-path (заливка); геометрію міряємо один раз і при зміні розміру. */
+  /* Лінія — від центру першої точки до центру останньої (на комп'ютері по горизонталі, на телефоні по вертикалі),
+     один раз за 1,8 с, power1.inOut. Лінія й доріжка лежать під колами (кола непрозорі, z-index 1), тож усередині
+     кола лінії не видно. Коли голова лінії заходить під коло, воно поступово заливається з того боку, звідки прийшла
+     лінія (--f від 0 до 1 → clip-path шару .step-dot::before); заливка доходить до протилежного краю саме тоді, коли
+     лінія виходить з-під кола. Перше коло — від центру до краю (лінія стартує в його центрі), останнє — від краю до
+     центру (там лінія зупиняється). Світіння голови (.steps-head) теж під колами й згасає наприкінці. Номер і назва
+     кроку підсвічуються з початком заливки. Анімуються лише transform, opacity і clip-path. */
   const head = document.createElement('span');
   head.className = 'steps-head';
   head.setAttribute('aria-hidden', 'true');
   list.appendChild(head);
-  const st = { q: reduceMotion ? 1 : 0 };
+  const st = { p: reduceMotion ? 1 : 0 };
   let geo = null;
   let current = -2;
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
-  const SLOW = 20; // наскільки лінія сповільнюється в колі
   const measure = () => {
     const r = list.getBoundingClientRect();
     const rects = dots.map((d) => d.getBoundingClientRect());
@@ -393,60 +393,37 @@ function steps() {
     const size = vertical ? r.height : r.width;
     list.style.setProperty('--steps-from', `${c[0].toFixed(1)}px`);
     list.style.setProperty('--steps-to', `${(size - c[c.length - 1]).toFixed(1)}px`);
-    // Швидкість голови: біля кожного кола вона плавно (гаусова «яма») падає, тож заливка кола триває ~0,25–0,3 с і її
-    // видно, а між колами лінія плавно розганяється — без пауз і стрибків. Таблиця «частка часу → положення»
-    const start = c[0] - rad;
-    const end = c[c.length - 1] + rad;
-    const N = 600;
-    const w = rad * 1.6;
-    const xs = [];
-    const ts = [0];
-    let acc = 0;
-    for (let k = 0; k <= N; k++) {
-      const x = start + (end - start) * k / N;
-      xs.push(x);
-      if (k) {
-        let slow = 1;
-        for (const ci of c) slow += SLOW * Math.exp(-(((x - ci) / w) ** 2));
-        acc += slow;
-        ts.push(acc);
-      }
-    }
-    geo = { vertical, c, cross, rad, start, end, xs, ts: ts.map((t) => t / acc) };
+    geo = { vertical, c, cross, rad };
     render();
   };
   const render = () => {
     if (!geo) return;
-    const { vertical, c, cross, rad, xs, ts } = geo;
-    // Положення голови за часткою часу q (пошук у таблиці й лінійна інтерполяція)
-    let lo = 0;
-    let hi = ts.length - 1;
-    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (ts[m] <= st.q) lo = m; else hi = m; }
-    const k = ts[hi] > ts[lo] ? (st.q - ts[lo]) / (ts[hi] - ts[lo]) : 0;
-    const h = xs[lo] + (xs[hi] - xs[lo]) * clamp01(k);
-    list.style.setProperty('--steps-p', clamp01((h - c[0]) / (c[c.length - 1] - c[0])).toFixed(4));
+    const { vertical, c, cross, rad } = geo;
+    const last = c.length - 1;
+    const h = c[0] + (c[last] - c[0]) * st.p; // голова лінії
+    list.style.setProperty('--steps-p', st.p.toFixed(4));
     let idx = -1;
     dots.forEach((d, i) => {
-      const f = clamp01((h - (c[i] - rad)) / (2 * rad));
+      const from = i === 0 ? c[0] : c[i] - rad;
+      const to = i === last ? c[last] : c[i] + rad;
+      const f = clamp01((h - from) / (to - from));
       d.style.setProperty('--f', f.toFixed(3));
-      if (f > 0) idx = i;
+      if (f > 0 || i === 0) idx = i;
     });
-    const hp = Math.min(h, c[c.length - 1]);
-    head.style.transform = vertical ? `translate3d(${cross.toFixed(1)}px, ${hp.toFixed(1)}px, 0)` : `translate3d(${hp.toFixed(1)}px, ${cross.toFixed(1)}px, 0)`;
+    head.style.transform = vertical ? `translate3d(${cross.toFixed(1)}px, ${h.toFixed(1)}px, 0)` : `translate3d(${h.toFixed(1)}px, ${cross.toFixed(1)}px, 0)`;
     if (idx === current) return;
     current = idx;
     items.forEach((li, i) => {
       li.classList.toggle('is-on', i <= idx);
       li.classList.toggle('is-current', i === idx);
     });
-    const mood = Math.max(0, idx);
-    motion.stepMood = STEP_MOODS[mood % STEP_MOODS.length];
+    motion.stepMood = STEP_MOODS[idx % STEP_MOODS.length];
     if (motion.hero && motion.hero.host === sec.querySelector('[data-steps-scene]')) motion.hero.setMood(motion.stepMood);
   };
   measure();
   if ('ResizeObserver' in window) new ResizeObserver(measure).observe(list);
   if (reduceMotion) return; // одразу кінцевий стан: усі кола залиті, лінія до останнього, без світіння
-  // Коли блок з'являється, лінія один раз заповнюється (~2,4 с); прокрутка назад нічого не повертає
+  // Коли блок з'являється, лінія один раз заповнюється; прокрутка назад нічого не повертає
   ScrollTrigger.create({
     trigger: list,
     start: 'top 80%',
@@ -454,8 +431,8 @@ function steps() {
     onEnter: () => {
       gsap.to(head, { opacity: 1, duration: 0.25, ease: 'power2.out' });
       gsap.to(st, {
-        q: 1, duration: 2.4, ease: 'sine.inOut', onUpdate: render,
-        onComplete: () => gsap.to(head, { opacity: 0, duration: 0.7, ease: 'power2.inOut' }),
+        p: 1, duration: 1.8, ease: 'power1.inOut', onUpdate: render,
+        onComplete: () => gsap.to(head, { opacity: 0, duration: 0.6, ease: 'power2.inOut' }),
       });
     },
   });
