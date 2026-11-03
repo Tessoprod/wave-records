@@ -294,9 +294,18 @@ export function aboutPage({ photos }) {
           : [0, 1, 2, 3].map((i) => html`<li class="g-item g-${i}">${fragment(i, 'Місце для фото студії')}</li>`)}
       </ul>
     </div>
-    <dialog class="lightbox" data-lightbox aria-label="Фото студії">
-      <button type="button" class="lightbox-close btn btn-glass btn-icon" data-lightbox-close aria-label="Закрити">${icon.close}</button>
-      <img alt="" data-lightbox-img>
+    <!-- Перегляд фото (логіка — site.js): закриття — кругла скляна кнопка на самому фото, стрілки ← → і свайп гортають
+         галерею, Esc закриває; фокус при відкритті — на сам діалог (tabindex -1) -->
+    <dialog class="lightbox" data-lightbox aria-label="Фото студії" tabindex="-1">
+      <div class="lb-stage" data-lb-stage>
+        <figure class="lb-frame" data-lb-frame>
+          <img alt="" data-lightbox-img>
+          <button type="button" class="lightbox-close btn btn-glass btn-icon" data-lightbox-close aria-label="Закрити">${icon.close}</button>
+        </figure>
+      </div>
+      <button type="button" class="lb-nav lb-prev btn btn-glass btn-icon" data-lb-prev aria-label="Попереднє фото">${icon.chevL}</button>
+      <button type="button" class="lb-nav lb-next btn btn-glass btn-icon" data-lb-next aria-label="Наступне фото">${icon.chevR}</button>
+      <p class="lb-count" data-lb-count aria-live="polite"></p>
     </dialog>
   </section>` : ''}
 

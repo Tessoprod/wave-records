@@ -30,6 +30,10 @@ export const icon = {
   phone: raw('<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>'),
   telegram: raw('<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4 3 11l6 2 2 6 3-4 5 4 2-15Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m9 13 8-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'),
   mail: raw('<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="m4 7 8 6 8-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>'),
+  chevL: raw('<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'),
+  chevR: raw('<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'),
+  // Динамік: хвилі й хрестик показує CSS за рівнем гучності (.mini-vol[data-level])
+  volume: raw('<svg class="i i-vol" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="v-w1" d="M15.2 9.6a3.4 3.4 0 0 1 0 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="v-w2" d="M17.8 7a7.2 7.2 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="v-x" d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'),
   clock: raw('<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'),
 };
 
@@ -296,8 +300,14 @@ draw(103-117*p,5*Math.sin(Math.PI*t));if(t<1)requestAnimationFrame(f);else{d.cla
 
   <div class="mini-player glass" data-mini hidden>
     <button class="mini-btn" type="button" data-mini-toggle aria-label="Пауза">${icon.play}${icon.pause}</button>
-    <div class="mini-meta"><span class="mini-title" data-mini-title></span><span class="mini-time" data-mini-time>00:00</span></div>
+    <!-- Назва й час — кнопка «Перейти до треку» (клік по будь-якому місцю бару, окрім кнопок і гучності, робить те саме) -->
+    <button class="mini-meta" type="button" data-mini-go aria-label="Перейти до треку"><span class="mini-title" data-mini-title></span><span class="mini-time" data-mini-time>00:00</span></button>
     <div class="mini-meter meter" data-live aria-hidden="true"></div>
+    <!-- Гучність — лише на комп'ютері (на телефоні гучність регулюють кнопки телефона) -->
+    <div class="mini-vol" data-mini-vol data-level="high">
+      <button class="mini-mute" type="button" data-mini-mute aria-label="Вимкнути звук">${icon.volume}</button>
+      <input class="mini-range" type="range" min="0" max="100" step="1" value="100" data-mini-range aria-label="Гучність" aria-valuetext="100%">
+    </div>
     <button class="mini-close" type="button" data-mini-close aria-label="Зупинити і закрити плеєр">${icon.close}</button>
   </div>
 

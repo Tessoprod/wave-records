@@ -320,7 +320,18 @@
   let analyser = null;
   let freq = null;
   let raf = 0;
+  let gain = null;
   const playedOnce = new Set();
+  // Позиція кожного треку (за id) у пам'яті сторінки: перемкнули на інший — попередній продовжиться з того ж місця
+  const positions = new Map();
+  const setWave = (el, t) => {
+    const dur = durationOf(el);
+    const wave = $('.track-wave', el);
+    wave.style.setProperty('--p', `${dur ? Math.min(100, (t / dur) * 100) : 0}%`);
+    wave.setAttribute('aria-valuenow', String(Math.round(t)));
+    wave.setAttribute('aria-valuetext', fmt(t));
+    $('[data-cur]', el).textContent = fmt(t);
+  };
 
   function peaksOf(el) {
     const raw = (el.dataset.peaks || '').split(',').map(Number).filter((n) => Number.isFinite(n));
@@ -375,10 +386,14 @@
       analyser = ctx.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.78;
+      // джерело → аналізатор → гучність → вихід: аналізатор (фон, хвилі, 3D) бачить сигнал без змін за будь-якої гучності
+      gain = ctx.createGain();
       src.connect(analyser);
-      analyser.connect(ctx.destination);
+      analyser.connect(gain);
+      gain.connect(ctx.destination);
       freq = new Uint8Array(analyser.frequencyBinCount);
-    } catch { ctx = null; analyser = null; }
+    } catch { ctx = null; analyser = null; gain = null; }
+    applyVolume();
   }
 
   function liveLoop() {
@@ -414,11 +429,18 @@
 
   function select(el) {
     if (current === el) return;
-    if (current) current.classList.remove('is-active', 'is-playing');
+    if (current) {
+      if (!audio.ended && audio.currentTime > 0) positions.set(current.dataset.id, audio.currentTime);
+      setWave(current, positions.get(current.dataset.id) || 0);
+      current.classList.remove('is-active', 'is-playing');
+    }
     current = el;
     el.classList.add('is-active');
     audio.src = el.dataset.src;
     audio.preload = 'auto';
+    // Продовжити з місця, де трек зупинили, щойно завантажаться метадані
+    const saved = positions.get(el.dataset.id);
+    if (saved) audio.addEventListener('loadedmetadata', () => { if (current === el && audio.currentTime < 0.5) audio.currentTime = Math.min(saved, (audio.duration || saved) - 0.5); }, { once: true });
     if (mini) {
       mini.hidden = false;
       $('[data-mini-title]', mini).textContent = el.dataset.title;
@@ -470,7 +492,7 @@
     wave.addEventListener('keydown', (e) => {
       const dur = durationOf(el);
       if (!dur) return;
-      const t = current === el ? audio.currentTime : 0;
+      const t = current === el ? audio.currentTime : (positions.get(el.dataset.id) || 0);
       const step = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5, PageUp: 15, PageDown: -15 }[e.key];
       if (step !== undefined) { e.preventDefault(); seekTo(el, (t + step) / dur); }
       if (e.key === 'Home') { e.preventDefault(); seekTo(el, 0); }
@@ -478,6 +500,38 @@
       if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePlay(el); }
     });
   });
+
+  /* Гучність (лише комп'ютер; на телефоні регулятора немає — гучність кнопками телефона): спільна для всіх треків,
+     зберігається в localStorage. З Web Audio — GainNode, без нього — audio.volume. */
+  const volBox = mini && $('[data-mini-vol]', mini);
+  const volRange = volBox && $('[data-mini-range]', volBox);
+  const volBtn = volBox && $('[data-mini-mute]', volBox);
+  const volOn = !!volBox && matchMedia('(hover: hover) and (pointer: fine) and (min-width: 861px)').matches;
+  let vol = 1;
+  let muted = false;
+  if (volOn) {
+    try { const v = JSON.parse(localStorage.getItem('wr_volume') || 'null'); if (v && Number.isFinite(v.v)) { vol = Math.max(0, Math.min(1, v.v)); muted = !!v.m; } } catch { /* немає доступу */ }
+  }
+  function applyVolume() {
+    const v = volOn && (muted || vol === 0) ? 0 : volOn ? vol : 1;
+    if (gain && ctx) { audio.volume = 1; gain.gain.setTargetAtTime(v, ctx.currentTime, 0.015); } else audio.volume = v;
+    if (!volBox) return;
+    const pct = Math.round((muted ? 0 : vol) * 100);
+    volRange.value = String(pct);
+    volRange.setAttribute('aria-valuetext', `${pct}%`);
+    volBox.style.setProperty('--vol', `${pct}%`);
+    volBox.dataset.level = muted || vol === 0 ? 'mute' : vol < 0.5 ? 'low' : 'high';
+    volBtn.setAttribute('aria-label', muted || vol === 0 ? 'Увімкнути звук' : 'Вимкнути звук');
+  }
+  const saveVolume = () => { try { localStorage.setItem('wr_volume', JSON.stringify({ v: vol, m: muted })); } catch { /* приватний режим */ } };
+  if (volOn) {
+    volRange.addEventListener('input', () => { vol = Number(volRange.value) / 100; muted = vol === 0; applyVolume(); saveVolume(); });
+    volBtn.addEventListener('click', () => {
+      if (muted || vol === 0) { muted = false; if (vol === 0) vol = 0.5; } else muted = true;
+      applyVolume(); saveVolume();
+    });
+  }
+  applyVolume();
 
   audio.addEventListener('timeupdate', updateProgress);
   audio.addEventListener('loadedmetadata', updateProgress);
@@ -494,6 +548,8 @@
     setLive(false);
   });
   audio.addEventListener('ended', () => {
+    // Трек дограв — його позиція з початку
+    if (current) { positions.delete(current.dataset.id); setWave(current, 0); }
     // наступний трек з того самого списку
     const list = current?.closest('.tracks');
     const items = list ? $$('[data-track]', list) : [];
@@ -503,7 +559,21 @@
 
   if (mini) {
     $('[data-mini-toggle]', mini).addEventListener('click', () => { if (current) togglePlay(current); });
+    // Клік по бару (окрім кнопок і гучності) чи кнопка «Перейти до треку» — плавно до рядка треку (з відступом під
+    // шапку: Lenis і браузер беруть його зі scroll-padding-top), рядок коротко підсвічується
+    const flash = (el) => { el.classList.remove('is-flash'); void el.offsetWidth; el.classList.add('is-flash'); setTimeout(() => el.classList.remove('is-flash'), 1500); };
+    const goToTrack = () => {
+      if (!current) return;
+      const el = current;
+      const lenis = window.wrMotion?.lenis;
+      if (lenis) lenis.scrollTo(el, { offset: -16, duration: 1, onComplete: () => flash(el) });
+      else { el.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' }); setTimeout(() => flash(el), reduceMotion ? 0 : 650); }
+    };
+    mini.addEventListener('click', (e) => {
+      if (e.target.closest('[data-mini-go]') || !e.target.closest('button, input, [data-mini-vol]')) goToTrack();
+    });
     $('[data-mini-close]', mini).addEventListener('click', () => {
+      if (current && audio.currentTime > 0 && !audio.ended) positions.set(current.dataset.id, audio.currentTime);
       audio.pause();
       mini.hidden = true;
       current?.classList.remove('is-active', 'is-playing');
@@ -650,16 +720,137 @@
   // Навігація-прогрес на сторінках Послуги й Портфоліо — той самий компонент, що на FAQ
   $$('[data-secnav]').forEach((el) => sectionNav(el, $$('[data-secnav-group]', el)));
 
-  /* ---------- Галерея ---------- */
+  /* ---------- Галерея: перегляд фото ----------
+     Діалог на весь екран; фото в рамці .lb-frame, кнопка закриття — на самому фото (правий верхній кут).
+     Гортання: стрілки ← → на клавіатурі, скляні кнопки-стрілки (комп'ютер), свайп (Pointer Events: фото йде за пальцем
+     і докручується до сусіднього, якщо зсув > ¼ ширини чи свайп швидкий, інакше повертається; свайп униз закриває).
+     Перехід — зсув із легким згасанням (~0,37 с); сусідні фото вантажаться заздалегідь. Далі фото немає — «упор»:
+     фото трохи зсувається в бік спроби (при свайпі — з опором) і пружно повертається; стрілка з того боку неактивна.
+     prefers-reduced-motion — без зсувів, лише проявлення. Фокус при відкритті — на сам діалог (без контуру),
+     контур на кнопках — лише при навігації Tab (:focus-visible). */
   const lightbox = $('[data-lightbox]');
   if (lightbox && typeof lightbox.showModal === 'function') {
     const img = $('[data-lightbox-img]', lightbox);
-    $$('.g-open').forEach((b) => b.addEventListener('click', () => {
-      img.src = b.dataset.full;
-      img.alt = b.dataset.alt || '';
+    const frame = $('[data-lb-frame]', lightbox);
+    const stage = $('[data-lb-stage]', lightbox);
+    const prevBtn = $('[data-lb-prev]', lightbox);
+    const nextBtn = $('[data-lb-next]', lightbox);
+    const count = $('[data-lb-count]', lightbox);
+    const opens = $$('.g-open');
+    const photos = opens.map((b) => ({ src: b.dataset.full, alt: b.dataset.alt || '' }));
+    let index = 0;
+    let busy = false;
+    const preload = (i) => { if (photos[i]) { const im = new Image(); im.decoding = 'async'; im.src = photos[i].src; } };
+    const decoded = () => (img.decode ? img.decode().catch(() => {}) : Promise.resolve());
+    const clear = () => frame.getAnimations().forEach((a) => a.cancel());
+    const anim = (keyframes, opts) => frame.animate(keyframes, { fill: 'forwards', ...opts }).finished.catch(() => {});
+    function sync() {
+      prevBtn.disabled = index <= 0;
+      nextBtn.disabled = index >= photos.length - 1;
+      count.textContent = `${index + 1} / ${photos.length}`;
+      count.hidden = photos.length < 2;
+      preload(index - 1);
+      preload(index + 1);
+    }
+    function setPhoto(i) {
+      index = i;
+      img.src = photos[i].src;
+      img.alt = photos[i].alt;
+      sync();
+    }
+    // Упор: далі фото немає — фото трохи зсувається в бік спроби й пружно повертається
+    async function bump(dir, fromX = 0) {
+      if (reduceMotion) return;
+      clear();
+      const x = fromX || dir * 34;
+      if (!fromX) await anim([{ transform: 'translate3d(0,0,0)' }, { transform: `translate3d(${x}px,0,0)` }], { duration: 130, easing: 'cubic-bezier(0, 0, .2, 1)' });
+      await anim([{ transform: `translate3d(${x}px,0,0)` }, { transform: 'translate3d(0,0,0)' }], { duration: 480, easing: 'cubic-bezier(.2, 1.45, .35, 1)' });
+      clear();
+    }
+    // Перехід до сусіднього фото: поточне йде в бік гортання зі згасанням, нове заходить з протилежного боку
+    async function go(dir, fromX = 0) {
+      if (busy) return;
+      const to = index + dir;
+      if (to < 0 || to >= photos.length) { bump(dir, fromX); return; }
+      busy = true;
+      clear();
+      const shift = reduceMotion ? 0 : 60;
+      const out = fromX ? fromX - dir * 80 : -dir * shift;
+      await anim([{ transform: `translate3d(${fromX}px,0,0)`, opacity: 1 }, { transform: `translate3d(${out}px,0,0)`, opacity: 0 }], { duration: 170, easing: 'cubic-bezier(.4, 0, 1, 1)' });
+      setPhoto(to);
+      await decoded();
+      await anim([{ transform: `translate3d(${dir * shift}px,0,0)`, opacity: 0 }, { transform: 'translate3d(0,0,0)', opacity: 1 }], { duration: 200, easing: 'cubic-bezier(0, 0, .2, 1)' });
+      clear();
+      busy = false;
+    }
+    opens.forEach((b, i) => b.addEventListener('click', () => {
+      setPhoto(i);
       lightbox.showModal();
+      // showModal сам фокусує першу кнопку (і стрілки потім «підсвічували» закриття) — фокус на сам діалог
+      lightbox.focus({ preventScroll: true });
+      if (!reduceMotion) decoded().then(() => anim([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(0, 0, .2, 1)' })).then(clear);
     }));
     $('[data-lightbox-close]', lightbox).addEventListener('click', () => lightbox.close());
-    lightbox.addEventListener('click', (e) => { if (e.target === lightbox) lightbox.close(); });
+    prevBtn.addEventListener('click', () => go(-1));
+    nextBtn.addEventListener('click', () => go(1));
+    lightbox.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+    });
+    // Клік повз фото (по затемненню) — закрити
+    lightbox.addEventListener('click', (e) => { if (e.target === lightbox || e.target === stage) lightbox.close(); });
+
+    // Свайп (палець чи стилус; мишею — кліки й стрілки)
+    let drag = null;
+    stage.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' || busy || e.target.closest('button')) return;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), axis: '', dx: 0, dy: 0 };
+    });
+    stage.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (!drag.axis) {
+        if (Math.hypot(dx, dy) < 8) return;
+        drag.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+        try { stage.setPointerCapture(e.pointerId); } catch { /* палець уже відпущено */ }
+        clear();
+      }
+      if (drag.axis === 'x') {
+        const edge = (dx > 0 && index === 0) || (dx < 0 && index === photos.length - 1);
+        // Біля краю — опір, що зростає з відстанню (не більше ~40 px)
+        drag.dx = edge ? Math.sign(dx) * 40 * (1 - Math.exp(-Math.abs(dx) / 120)) : dx;
+        if (!reduceMotion) frame.style.transform = `translate3d(${drag.dx}px,0,0)`;
+        frame.style.opacity = String(1 - Math.min(0.35, Math.abs(drag.dx) / (frame.offsetWidth * 2.5)));
+      } else {
+        drag.dy = Math.max(0, dy);
+        if (!reduceMotion) frame.style.transform = `translate3d(0,${drag.dy * 0.6}px,0)`;
+        frame.style.opacity = String(1 - Math.min(0.5, drag.dy / 500));
+      }
+    });
+    const endDrag = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const d = drag;
+      drag = null;
+      const dt = Math.max(1, performance.now() - d.t);
+      frame.style.transform = '';
+      frame.style.opacity = '';
+      if (d.axis === 'x') {
+        const dir = d.dx < 0 ? 1 : -1;
+        const edge = (dir < 0 && index === 0) || (dir > 0 && index === photos.length - 1);
+        const fast = Math.abs(d.dx) / dt > 0.5 && Math.abs(d.dx) > 30;
+        const x = reduceMotion ? 0 : d.dx;
+        if (edge) bump(dir, x);
+        else if (Math.abs(d.dx) > frame.offsetWidth / 4 || fast) go(dir, x);
+        else if (x) anim([{ transform: `translate3d(${x}px,0,0)` }, { transform: 'translate3d(0,0,0)' }], { duration: 420, easing: 'cubic-bezier(.2, 1.3, .35, 1)' }).then(clear);
+      } else if (d.axis === 'y') {
+        if (d.dy > 110) { lightbox.close(); return; }
+        const y = reduceMotion ? 0 : d.dy * 0.6;
+        if (y) anim([{ transform: `translate3d(0,${y}px,0)` }, { transform: 'translate3d(0,0,0)' }], { duration: 380, easing: 'cubic-bezier(.2, 1.2, .35, 1)' }).then(clear);
+      }
+    };
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+    lightbox.addEventListener('close', () => { clear(); frame.style.transform = ''; frame.style.opacity = ''; busy = false; drag = null; });
   }
 })();
