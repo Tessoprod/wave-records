@@ -59,6 +59,21 @@ function smoothScroll() {
   const syncMenu = () => (body.classList.contains('menu-open') ? lenis.stop() : lenis.start());
   new MutationObserver(syncMenu).observe(body, { attributes: true, attributeFilter: ['class'] });
 
+  // Смуга прокрутки займає місце (Windows)? Тоді зупинений Lenis не міняє overflow сторінки (інакше смуга зникає
+  // й ширина стрибає на ~15 px — див. html.sb-classic у site.css). Міряємо зараз: Lenis ще не зупинявся.
+  // Колесо й дотик блокує сам Lenis, клавіші прокрутки — тут.
+  root.classList.toggle('sb-classic', innerWidth - root.clientWidth > 0);
+  // Поля вводу, кнопки й елементи з власною прокруткою ([data-lenis-prevent], як меню) свої клавіші отримують
+  const SCROLL_KEYS = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
+  addEventListener('keydown', (e) => {
+    if (!lenis.isStopped || !SCROLL_KEYS.has(e.key) || e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey) return;
+    const t = e.target instanceof Element ? e.target : null;
+    if (t?.closest('input, textarea, select, button, summary, [contenteditable], [role="slider"]')) return;
+    const own = t?.closest('[data-lenis-prevent]');
+    if (own && own.scrollHeight > own.clientHeight + 1) return;
+    e.preventDefault();
+  });
+
   // Якорі на цій самій сторінці (зокрема «Перейти до вмісту» і пункти меню): плавний перехід з відступом під шапку;
   // якщо відкрите меню — спершу воно закривається
   document.addEventListener('click', (e) => {
@@ -841,6 +856,34 @@ function intro() {
   });
 }
 
+/* Поділ рядка на літери без зсуву. Окремі літери втрачають кернінг (пари AV, WA…): розбитий WAVE RECORDS
+   ширший за цілий на ~8 px, і після split.revert() центрований рядок стискався — краї стрибали на ~4 px.
+   Тому до поділу запам'ятовуємо, де стоїть кожна літера в цілому рядку, а після — ставимо кожну на те саме
+   місце відступом (в em, щоб пережити зміну розміру). Тоді розбитий і цілий рядок однакові до долі пікселя. */
+function splitCharsKerned(line) {
+  const range = document.createRange();
+  const before = [];
+  const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+  for (let node; (node = walker.nextNode());) {
+    for (let i = 0; i < node.length; i++) {
+      if (/\s/.test(node.data[i])) continue;
+      range.setStart(node, i); range.setEnd(node, i + 1);
+      before.push(range.getBoundingClientRect().left);
+    }
+  }
+  const split = SplitText.create(line, { type: 'chars', mask: 'chars' });
+  const chars = split.chars;
+  if (chars.length !== before.length) return split;
+  const fs = parseFloat(getComputedStyle(line).fontSize) || 1;
+  // Відступ літери i зсуває всі наступні, тож міряємо по черзі, відносно першої літери
+  for (let i = 1; i < chars.length; i++) {
+    const box = chars[i].parentElement !== line && chars[i].parentElement.childElementCount === 1 ? chars[i].parentElement : chars[i];
+    const delta = (before[i] - before[0]) - (chars[i].getBoundingClientRect().left - chars[0].getBoundingClientRect().left);
+    if (Math.abs(delta) > 0.01) box.style.marginLeft = `${delta / fs}em`;
+  }
+  return split;
+}
+
 /* Поява першого екрана (його «назва сторінки»): викликає диригент після інтро чи шторки.
    Текст і 3D-сцена проявляються разом, один раз; якщо сцена ще не готова — проявиться, щойно буде.
    Літери WAVE RECORDS виїжджають знизу, далі решта. */
@@ -862,7 +905,7 @@ function heroIntro(still = false) {
     // На телефоні рядок не ділимо на літери: при поділі змінюється кернінг і ширина рядка (~2 px), а після анімації
     // (split.revert) центрований рядок «стрибав» на кілька пікселів. Там рядок виїжджає цілим
     const phone = matchMedia('(max-width: 860px)').matches;
-    const split = SplitText && line1 && !phone ? SplitText.create(line1, { type: 'chars', mask: 'chars' }) : null;
+    const split = SplitText && line1 && !phone ? splitCharsKerned(line1) : null;
     const tl = gsap.timeline({ defaults: { ease: EASE }, onComplete: () => split?.revert() });
     if (split) tl.from(split.chars, { yPercent: 110, duration: 1.2, stagger: 0.035 });
     else if (line1) tl.from(line1, { y: 40, opacity: 0, duration: 1.1 });

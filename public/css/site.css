@@ -84,9 +84,14 @@ html { background: var(--black); -webkit-text-size-adjust: 100%; scroll-behavior
 /* Ширина сторінки не змінюється від смуги прокрутки: місце під неї зарезервоване завжди. Інакше під час інтро, переходу
    з меню чи відкритого меню (прокрутка вимкнена — смуга зникає) ширина документа стрибала на ~15 px, і великі
    заголовки (text-wrap: balance, ширина в ch) переносили рядки інакше — назва «Про студію» міняла форму.
-   Lenis у зупиненому стані ставить overflow: clip, а при clip місце під смугу не резервується — тому hidden */
+   Але Edge/Chrome (перевірено у 157) тримають це місце лише поки сторінка прокручується: з overflow: hidden чи clip
+   на html (або на body, звідки воно переходить на вікно) смуга зникає попри scrollbar-gutter. Тому там, де смуга
+   займає місце (html.sb-classic — ставить motion.js), поки Lenis зупинений, overflow не міняємо (знімаємо його clip):
+   колесо й дотик блокує сам Lenis, клавіші — motion.js. Де смуга плаваюча (телефони, macOS) — ширина від неї
+   не залежить, і лишається звичайне блокування overflow: hidden (воно ж тримає дотики під меню) */
 html { scrollbar-gutter: stable; }
 html.lenis.lenis-stopped:not(.lenis-autoToggle) { overflow: hidden; }
+html.sb-classic.lenis.lenis-stopped:not(.lenis-autoToggle) { overflow: visible; }
 /* Коли працює плавний скрол Lenis (motion.js), вбудоване плавне прокручування браузера йому заважає */
 html.lenis { scroll-behavior: auto; }
 body {
@@ -543,7 +548,8 @@ html.lifting .header-book { transition: opacity .4s cubic-bezier(.45, 0, .55, 1)
   .menu-links li:nth-child(n) a { flex-direction: row; align-items: baseline; gap: 10px; padding: 2px 0 8px; font-size: clamp(26px, min(8vw, 5.4vh), 40px); }
   .menu-inner { gap: 14px; padding-top: calc(var(--header-h) + 6px); }
 }
-body.menu-open { overflow: hidden; }
+/* Зі смугою, що займає місце, сторінку під меню тримає Lenis (див. html.sb-classic вище); без Lenis — це блокування */
+html:not(.lenis) body.menu-open, html:not(.sb-classic) body.menu-open { overflow: hidden; }
 
 /* ---------- Секції ---------- */
 

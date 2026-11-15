@@ -100,6 +100,8 @@ before(async () => {
 after(() => {
   server?.close();
   if (google.listening) google.close();
+  // На Windows відкритий файл бази не видаляється (EPERM) — спершу закриваємо базу
+  mod?.db?.db?.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
