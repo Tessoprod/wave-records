@@ -28,7 +28,7 @@ const revealed = window.wrRevealed || Promise.resolve();
 const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
 // Шрифти для появи назви: назву ділимо на рядки й показуємо лише зі справжніми шрифтами заголовків (Inter Tight 900 для
 // кирилиці й Archivo Black для латиниці; раніше чекали лише Archivo Black, у якому кирилиці немає, — тобто ні на що).
-// З запасним шрифтом інакше переносяться рядки (ширина .about-title — у ch, що залежить від шрифту) і змінюється
+// З запасним шрифтом інакше переносяться рядки і змінюється
 // розмір — заголовок «стрибав» би після завантаження. Відлік іде від старту сторінки, паралельно з інтро чи шторкою;
 // крайній строк 6 с (якщо шрифт так і не завантажився — показуємо запасним).
 const fontsForTitle = Promise.race([
@@ -968,6 +968,7 @@ async function heroScene() {
   }, { passive: true });
 
   // Скрол: поки перший екран їде вгору, скульптура віддаляється, зменшується і зміщується
+  await motion.stageReady;
   if (ScrollTrigger && !motion.stage) {
     ScrollTrigger.create({
       trigger: host.closest('.hero') || host,
@@ -1051,6 +1052,7 @@ async function conductor() {
   motion.contentStarted = true;
   window.wrArmFailsafe?.();
   await fontsForTitle; // рядки ділимо за справжніми шрифтами (див. fontsForTitle)
+  await motion.stageReady; // headings(), blocks() і plainFade() мають знати, чи працює сцена Послуг
   heroIntro();
   pageTitle();
   // Решта — слідом за назвою, щоб рух був шаруватим
@@ -1091,9 +1093,15 @@ try {
   motion.introDone = intro();
   motion.entered = reduceMotion ? Promise.resolve() : entrance();
   scrollHint();
-  // Сцена Послуг і згасання першого екрана лише задають стани, прив'язані до прокрутки (без появи)
-  motion.stage = servicesStage();
-  if (!motion.stage) { heroFadeStandalone(); servicesPause(); }
+  // Сцена Послуг і згасання першого екрана лише задають стани, прив'язані до прокрутки (без появи).
+  // Чи вміщаються Послуги в екран — міряємо зі справжніми шрифтами (не довше 2 с): Safari часто отримує шрифти
+  // пізніше, а запасний шрифт на Mac інший — секція здавалася вищою за екран, і виліт вимикався до кінця візиту.
+  motion.stage = false;
+  motion.stageReady = Promise.race([fontsForTitle, new Promise((r) => setTimeout(r, 2000))]).then(() => {
+    try { motion.stage = servicesStage(); } catch (err) { console.error(err); root.classList.remove('stage-on'); motion.stage = false; }
+    if (!motion.stage) { heroFadeStandalone(); servicesPause(); }
+    ScrollTrigger.refresh();
+  });
   marquees();
   magnets();
   menuWave();
