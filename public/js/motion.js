@@ -160,7 +160,7 @@ function headings() {
 }
 // Вміст без власної анімації (текст юридичних сторінок, кнопки, фото, футер) — м'яке проявлення.
 // Прозорість лишається вбудованою (opacity: 1): інакше знову спрацює приховане правило з site.css
-const PLAIN = 'main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn, .section-steps .steps, .steps-cta, .marquee, .book-help, .faq-nav, .faq-group-title, .faq-help, .faq-home-ctas, .site-footer';
+const PLAIN = 'main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn, .section-steps .steps, .steps-cta, .marquee, .book-help, .book-pick > .book-step-head, .faq-nav, .faq-group-title, .faq-help, .faq-home-ctas, .site-footer';
 function plainFade() {
   // Блок Послуг на головній (сцена з закріпленням) проявляє сама сцена — тут його не чіпаємо
   $$(PLAIN).filter((el) => !(motion.stage && el.closest('.svc-section'))).forEach((el) => {
@@ -338,10 +338,10 @@ function servicesPause() {
 
 /* ---------- 2. Картки, треки, номери ---------- */
 function blocks() {
-  const groups = motion.stage ? '.svc-full-grid, .phil-grid, .bento, .book-info, .gallery, .chips' : '.svc-grid, .svc-full-grid, .phil-grid, .bento, .book-info, .gallery, .chips';
+  const groups = motion.stage ? '.svc-full-grid, .phil-grid, .bento, .book-info, .book-svc-grid, .book-how, .gallery, .chips' : '.svc-grid, .svc-full-grid, .phil-grid, .bento, .book-info, .book-svc-grid, .book-how, .gallery, .chips';
   cascade($$(`:is(${groups}) > *`));
   cascade($$('.faq-list > .faq-item'), { y: 24, stagger: 0.06 });
-  $$('.book-embed, .cta-band, .tl-text, .empty-state').forEach((el) => cascade([el], { y: 30 }));
+  $('.cta-band, .tl-text, .empty-state').forEach((el) => cascade([el], { y: 30 }));
 
   // Треки в'їжджають по черзі, хвиля промальовується зліва направо
   cascade($$('.tracks > .track'), {

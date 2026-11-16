@@ -7,7 +7,7 @@
 // Локально: node --disable-warning=ExperimentalWarning static/build.js
 //   BASE_PATH=/wave-records  — якщо сайт відкривається з підпапки (username.github.io/wave-records)
 //   BASE_URL=https://...      — повна адреса сайту (для sitemap і посилань у соцмережах)
-// Питання та відповіді — content/faq.json (сторінка /faq/).
+// Питання та відповіді — content/faq.json (сторінка /faq/). Онлайн-запис (Cal.com) — content/booking.json (сторінка /book/).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -156,7 +156,13 @@ async function main() {
     const issues = checkFaq(faq);
     if (issues.length) fail(`Помилка у файлі content/faq.json:\n${issues.map((m) => `     – ${m}`).join('\n')}`);
   }
+  const bookingCfg = readJson('booking.json');
+  const { bookingServices } = await import('../src/cal-booking.js');
+  const booking = bookingServices(bookingCfg, services.sound || []);
+  if (bookingCfg && booking.issues.length) fail(`Помилка у файлі content/booking.json:\n${booking.issues.map((m) => `     – ${m}`).join('\n')}`);
   if (problems.length) return;
+  // Куди ведуть кнопки «Записатися»: /book?service=id — лише для послуг, на які є онлайн-запис
+  const bookIds = new Set(booking.services.map((s) => s.id));
 
   saveSettings({
     company: String(settings.company || 'Wave Records'),
@@ -184,7 +190,9 @@ async function main() {
 
   // Послуги
   const row = (s, i, bookable) => ({
-    id: i + 1, slug: '', name: String(s.name || ''), price_label: String(s.price || ''), description: String(s.description || ''),
+    id: i + 1,
+    // Головна: поле book (id послуги для запису); Послуги: власний id картки
+    slug: [s.book, s.id].find((x) => bookIds.has(x)) || '', name: String(s.name || ''), price_label: String(s.price || ''), description: String(s.description || ''),
     home_title: String(s.name || ''), home_price: String(s.price || ''), bookable: bookable ? 1 : 0,
     category: bookable ? 'sound' : 'media',
     // Якір картки на сторінці Послуг (id) і посилання з головної на цю картку (link → /services#link)
@@ -211,8 +219,8 @@ async function main() {
     ...photosIn('gallery', 'gallery'),
   ];
 
-  const booking = views.parseBookingUrl(readText('booking-link.txt'));
-  if (!booking.url) warn('content/booking-link.txt порожній — на сторінці запису поки показуються кнопки Telegram і телефону.');
+  const calReady = booking.services.filter((s) => s.calLink).length;
+  if (!calReady) warn('content/booking.json: типи запису Cal.com ще не заповнені — на сторінці запису замість календаря кнопка «Записатися в Telegram».');
 
   // Рендер сторінок
   const pages = {
@@ -220,7 +228,7 @@ async function main() {
     'services/index.html': views.servicesPage({ sound, media, business }),
     'portfolio/index.html': views.portfolioPage({ vocal, music, b2b }),
     'about/index.html': views.aboutPage({ photos }),
-    'book/index.html': views.staticBookPage({ booking }),
+    'book/index.html': views.calBookPage({ services: booking.services, texts: bookingCfg.texts || {} }),
     'contacts/index.html': views.contactsPage(),
     'faq/index.html': views.faqPage(faq),
     'privacy-policy/index.html': views.legalPage('legal.privacy', '/privacy-policy'),
@@ -267,7 +275,7 @@ async function main() {
   (await import('../src/db.js')).db.close();
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(`\n✅ Сайт зібрано: ${Object.keys(pages).length} сторінок, треків: ${vocal.length + music.length + b2b.length}, фото: ${photos.length}.`);
-  console.log(`   Запис: ${booking.url ? (booking.embed ? 'календар Google вбудовано на сторінку' : 'кнопка-посилання на сторінку запису Google') : 'ще не підключено'}.`);
+  console.log(`   Запис: послуг ${booking.services.length}, з календарем Cal.com — ${calReady}.`);
 }
 
 await main();

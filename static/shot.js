@@ -13,6 +13,8 @@
 // --reduced  — браузер з --force-prefers-reduced-motion (без анімацій: стабільні кадри для порівняння «до/після»).
 // --hover=S  — навести мишу на перший елемент за CSS-селектором S (стан наведення); з --full не поєднується.
 // --intro    — показати інтро першого входу (за замовчуванням воно пропускається, щоб знімати саму сторінку).
+// --wait=N   — почекати ще N мс перед знімком (напр. поки завантажиться календар Cal.com на /book).
+//              Адресу можна вказати з параметрами: node static/shot.js "/book/?service=recording" 390
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -33,6 +35,7 @@ const full = !!flag('full');
 const fixedHeight = Number((flag('height') || '').split('=')[1]) || 0;
 const tag = (flag('tag') || '').split('=')[1];
 const hover = (flag('hover') || '').split('=').slice(1).join('=');
+const extraWait = Number((flag('wait') || '').split('=')[1]) || 0;
 const name = page.replace(/^\/|\/$/g, '').replace(/[\/?#=&]+/g, '-') || 'home';
 
 const browser = [
@@ -119,7 +122,7 @@ try {
         setTimeout(wait, 100); })(); })`,
       awaitPromise: true,
     });
-    await sleep(page === '/' ? 2200 : 600); // на головній — ще й поява заголовка
+    await sleep((page === '/' ? 2200 : 600) + extraWait); // на головній — ще й поява заголовка
     if (full) {
       // Анімації на скролі запускаються при першій появі: прогортаємо сторінку донизу й назад
       await send('Runtime.evaluate', {

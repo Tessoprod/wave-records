@@ -479,71 +479,118 @@ export function bookPage({ services, preselect }) {
   return layout({ title: info.title, path: '/book', description: 'Онлайн-запис на студійну сесію у Wave Records, Львів.', body, scripts: ['js/book.js'], bodyClass: 'page-book' });
 }
 
-/* ---------- /book для GitHub Pages: запис через Google Calendar ---------- */
+/* ---------- /book для GitHub Pages: запис через Cal.com ----------
+   Крок 1 — скляні картки послуг (назва, тривалість і ціна з services.json), крок 2 — календар Cal.com саме для цього
+   типу запису (inline embed). Поки тип запису не заповнений у booking.json — кнопка «Записатися в Telegram».
+   Логіка — public/js/book-cal.js: скрипт Cal.com вантажиться лише тут і лише після вибору послуги з календарем. */
 
-/** Приймає посилання на сторінку запису Google Calendar або весь код вбудовування з Google. */
-export function parseBookingUrl(input) {
-  const text = String(input || '').trim();
-  const m = text.match(/https:\/\/[^\s"'<>]+/);
-  if (!m) return { url: '', embed: false };
-  let url = m[0].replace(/&amp;/g, '&');
-  const embed = /calendar\.google\.com\/calendar\/appointments\//.test(url);
-  if (embed && !/[?&]gv=true/.test(url)) url += (url.includes('?') ? '&' : '?') + 'gv=true';
-  return { url, embed };
-}
-
-export function staticBookPage({ booking }) {
+export function calBookPage({ services, texts = {} }) {
   const info = block('book.info');
   const c = block('contacts');
-  const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${info.address}, ${c.city}`)}`;
-  const tg = c.telegram ? `https://t.me/${c.telegram}` : '';
-  const contactsRow = html`
-    <div class="hero-ctas">
-      ${tg ? html`<a class="btn btn-glass" href="${tg}" rel="noopener" data-cta="book_telegram">Написати в Telegram${icon.arrowUp}</a>` : ''}
-      <a class="btn btn-glass" href="${telLink(c.phone)}" data-cta="book_phone">Зателефонувати${icon.phone}</a>
-    </div>`;
-  let calendar;
-  if (booking.url && booking.embed) {
-    calendar = html`
-      <p class="book-embed-note">${info.calendar_note}</p>
-      <div class="book-embed-frame">
-        <iframe src="${booking.url}" title="Онлайн-запис у Wave Records" loading="lazy"></iframe>
-      </div>
-      <p class="muted book-embed-alt">Календар не завантажився? <a class="text-link" href="${booking.url.replace(/[?&]gv=true/, '')}" target="_blank" rel="noopener" data-cta="book_open_calendar">Відкрити запис в окремій вкладці${icon.arrowUp}</a></p>`;
-  } else if (booking.url) {
-    calendar = html`
-      <p class="book-embed-note">${info.calendar_note}</p>
-      <a class="btn btn-neon btn-lg" href="${booking.url}" target="_blank" rel="noopener" data-cta="book_open_calendar">Обрати дату й час${icon.arrowUp}</a>`;
-  } else {
-    calendar = html`
-      <p class="book-embed-note">Онлайн-запис скоро запрацює. Поки що напишіть або зателефонуйте нам — підберемо зручний час.</p>
-      ${contactsRow}`;
-  }
+  const t = texts;
+  const tg = telegramUrl();
+  const num = (i) => String(i + 1).padStart(2, '0');
+  const data = {
+    services: services.map((s) => ({ id: s.id, name: s.name, price: s.price, duration: s.duration, calLink: s.calLink })),
+    texts: { loading: t.loading, error: t.error },
+  };
+  const how = Array.isArray(t.how) ? t.how.filter((it) => it && it.title) : [];
+
   const body = html`
   <section class="page-head container">
     <h1 class="h1">${info.title}</h1>
+    ${t.lead ? html`<p class="page-lead">${t.lead}</p>` : ''}
   </section>
-  <section class="container book-wrap">
-    <div class="book-info">
-      <div class="info-card glass glass-card">
-        <span class="info-icon">${icon.pin}</span>
-        <div>
-          <p class="info-title">${info.address}</p>
-          <p class="muted">${info.address_note}</p>
-          <a class="text-link info-map" href="${mapUrl}" rel="noopener" target="_blank">Відкрити на мапі${icon.arrowUp}</a>
+
+  <div class="container book-flow" data-book>
+    <noscript><p class="book-noscript">Для онлайн-запису увімкніть JavaScript або напишіть нам у <a href="${tg}">Telegram</a> чи зателефонуйте: <a href="${telLink(c.phone)}">${c.phone}</a>.</p></noscript>
+
+    <section class="book-step book-pick" id="book-service" aria-labelledby="book-h-service">
+      <header class="book-step-head"><span class="book-step-num" aria-hidden="true">01</span><h2 class="book-step-title" id="book-h-service">${t.step_service}</h2></header>
+      <ul class="book-svc-grid" role="list">
+        ${services.map((s) => html`
+        <li><button type="button" class="book-svc glass glass-card" data-book-service="${s.id}" aria-pressed="false" aria-controls="book-time">
+          <span class="book-svc-name">${s.name}</span>
+          <span class="book-svc-meta">
+            ${s.duration ? html`<span class="book-svc-dur">${icon.clock}${s.duration}</span>` : ''}
+            <span class="book-svc-price">${s.price}</span>
+          </span>
+          <span class="book-svc-mark" aria-hidden="true"></span>
+        </button></li>`)}
+      </ul>
+    </section>
+
+    <!-- Крок 2 з'являється після вибору послуги -->
+    <section class="book-step book-time" id="book-time" aria-labelledby="book-h-time" hidden data-book-time>
+      <header class="book-step-head"><span class="book-step-num" aria-hidden="true">02</span><h2 class="book-step-title" id="book-h-time" tabindex="-1">${t.step_time}</h2></header>
+      <div class="book-chosen glass" aria-live="polite">
+        <div class="book-chosen-text">
+          <p class="book-chosen-label">${t.selected}</p>
+          <p class="book-chosen-name" data-book-name></p>
+          <p class="book-chosen-meta" data-book-meta></p>
+        </div>
+        <button type="button" class="btn btn-glass btn-sm book-change" data-book-change>${icon.chevL}<span>${t.change}</span></button>
+      </div>
+      <div class="book-cal glass glass-panel" data-book-cal>
+        <div class="book-cal-status" data-book-loading hidden>
+          <span class="book-cal-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span>${t.loading}</span>
+        </div>
+        <p class="book-cal-error" data-book-error role="alert" hidden>${t.error} <a class="text-link" href="#" target="_blank" rel="noopener" data-book-error-link>${t.error_link}${icon.arrowUp}</a></p>
+        <div class="book-stub" data-book-stub hidden>
+          <p class="book-stub-text">${t.stub_text}</p>
+          <a class="btn btn-neon" href="${tg}" rel="noopener" data-cta="book_stub_telegram">${t.stub_button}${icon.arrowUp}</a>
         </div>
       </div>
-      <div class="info-card glass glass-card">
-        <span class="info-icon">₴</span>
-        <p>${info.price_note}</p>
+      ${info.price_note ? html`<p class="book-note">${info.price_note}</p>` : ''}
+    </section>
+  </div>
+
+  ${how.length ? html`
+  <section class="section">
+    <div class="container">
+      <header class="sec-head"><h2 class="h2">${t.how_title}</h2></header>
+      <ol class="book-how" role="list">
+        ${how.map((it, i) => html`
+        <li class="book-how-item glass glass-card">
+          <span class="num">${num(i)}</span>
+          <h3 class="h3">${it.title}</h3>
+          ${it.text ? html`<p>${it.text}</p>` : ''}
+        </li>`)}
+      </ol>
+    </div>
+  </section>` : ''}
+
+  <section class="section">
+    <div class="container">
+      <header class="sec-head"><h2 class="h2">${t.contacts_title}</h2></header>
+      <div class="book-info book-contacts">
+        <div class="info-card glass glass-card">
+          <span class="info-icon">${icon.pin}</span>
+          <div>
+            <p class="info-title">${info.address}</p>
+            <p class="muted">${info.address_note}</p>
+            <a class="text-link info-map" href="${mapsUrl(c)}" rel="noopener" target="_blank" data-cta="book_map">${t.map_link}${icon.arrowUp}</a>
+          </div>
+        </div>
+        <a class="info-card info-link glass glass-card" href="${telLink(c.phone)}" data-cta="book_phone">
+          <span class="info-icon">${icon.phone}</span>
+          <span><span class="info-label">${t.phone}</span><span class="info-title">${c.phone}</span></span>
+        </a>
+        ${c.telegram ? html`
+        <a class="info-card info-link glass glass-card" href="${tg}" rel="noopener" data-cta="book_telegram">
+          <span class="info-icon info-icon-cyan">${icon.telegram}</span>
+          <span><span class="info-label">${t.telegram}</span><span class="info-title">@${c.telegram}</span></span>
+        </a>` : ''}
+      </div>
+      <div class="book-help">
+        <a class="btn btn-glass" href="${tg}" rel="noopener" data-cta="book_help_telegram">${t.help}${icon.arrowUp}</a>
       </div>
     </div>
-    <div class="book-embed glass glass-panel">
-      ${calendar}
-    </div>
-    ${booking.url ? html`<div class="book-help"><p class="muted">Не знайшли зручний час або є питання?</p>${contactsRow}</div>` : ''}
-  </section>`;
-  return layout({ title: info.title, path: '/book', description: 'Онлайн-запис на студійну сесію у Wave Records, Львів.', body, bodyClass: 'page-book' });
+  </section>
+
+  <script type="application/json" id="book-cal-data">${raw(JSON.stringify(data).replace(/</g, '\\u003c'))}</script>`;
+  return layout({ title: info.title, path: '/book', description: 'Онлайн-запис на студійну сесію у Wave Records, Львів.', body, scripts: ['js/book-cal.js'], bodyClass: 'page-book' });
 }
 
 /* ---------- /contacts ---------- */
