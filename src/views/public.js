@@ -534,7 +534,7 @@ export function calBookPage({ services, texts = {} }) {
         </div>
         <button type="button" class="btn btn-glass btn-sm book-change" data-book-change>${icon.chevL}<span>${t.change}</span></button>
       </div>
-      <div class="book-cal glass glass-panel" data-book-cal>
+      <div class="book-cal glass glass-panel" data-book-cal data-lenis-prevent>
         <div class="book-cal-status" data-book-loading hidden>
           <span class="book-cal-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
           <span>${t.loading}</span>

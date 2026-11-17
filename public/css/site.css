@@ -998,9 +998,12 @@ html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 .book-chosen-name { font-size: clamp(19px, 1.6vw, 22px); font-weight: 700; line-height: 1.25; margin-top: 4px; }
 .book-chosen-meta { color: var(--ink-2); font-size: 15px; margin-top: 2px; }
 .book-change { flex: none; }
-.book-cal { padding: clamp(8px, 1.4vw, 18px); min-height: 220px; }
-.book-cal-embed { width: 100%; border-radius: var(--r-md); overflow: hidden; }
-.book-cal-embed iframe { display: block; width: 100% !important; border: 0; }
+/* Над календарем Cal.com (сторонній iframe) — нічого: без обрізання, розмиття фону, рухомого відблиску й рамки-підсвітки;
+   висоту iframe задає сам Cal.com за своїми повідомленнями — тут лише ширина, без фіксованої висоти */
+.book-cal { padding: clamp(8px, 1.4vw, 18px); min-height: 220px; overflow: visible; isolation: auto; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.book-cal::before, .book-cal::after { display: none; }
+.book-cal-embed { width: 100%; }
+.book-cal-embed iframe { display: block; width: 100% !important; border: 0; border-radius: var(--r-md); }
 .book-cal-status { display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 380px; color: var(--ink-2); font-size: 16px; }
 .book-cal-spin { display: inline-flex; align-items: center; gap: 4px; height: 24px; }
 .book-cal-spin i { width: 3px; height: 100%; border-radius: 2px; background: var(--pink); opacity: .7; animation: book-eq 1s var(--ease) infinite alternate; }
@@ -1604,7 +1607,7 @@ html.from-menu::view-transition-group(vt-curtain) { display: none; }
   .book-svc-price { font-size: 17px; padding-right: 26px; }
   .book-chosen { padding: 16px 16px 16px 20px; }
   .book-cal { padding: 0; border-radius: var(--r-lg); }
-  .book-cal-embed { border-radius: inherit; }
+  .book-cal-embed iframe { border-radius: var(--r-lg); }
   .book-contacts { grid-template-columns: 1fr; }
   .book-help .btn { width: 100%; white-space: normal; text-align: center; line-height: 1.3; min-height: 56px; padding-block: 10px; }
 }

@@ -54,8 +54,12 @@
     const white = cssVar('--white', '');
     const vars = { 'cal-brand': pink, 'cal-brand-emphasis': pink, 'cal-brand-text': black, 'cal-text': white, 'cal-text-emphasis': white };
     for (const k of Object.keys(vars)) if (!vars[k]) delete vars[k];
-    return { theme: 'dark', hideEventTypeDetails: true, layout: 'month_view', cssVarsPerTheme: { dark: vars }, styles: pink ? { branding: { brandColor: pink } } : undefined };
+    return { theme: 'dark', hideEventTypeDetails: true, layout: 'month_view', cssVarsPerTheme: { dark: vars } };
   }
+
+  // ?debug=booking — у консоль: усі події від Cal.com і зміни висоти iframe
+  const DEBUG = new URLSearchParams(location.search).get('debug') === 'booking';
+  const dbg = (...a) => { if (DEBUG) console.log('[booking]', ...a); };
 
   const embeds = new Map(); // id послуги → { box, ready, failed, booked }
   const seenBookings = new Set();
@@ -161,6 +165,7 @@
 
   function onBooked(service, entry, e) {
     const d = (e && e.detail && e.detail.data) || {};
+    dbg('успішний запис', e && e.detail && e.detail.type, d);
     const info = bookingData(d);
     // Cal надсилає на один запис дві події (стару bookingSuccessful і нову V2) — друга лише доповнює дані
     if (entry.booked) {
@@ -194,6 +199,21 @@
     if (entry && !entry.ready && !entry.failed) loadTimer = setTimeout(() => { entry.failed = true; if (current && embeds.get(current.id) === entry) showStatus(entry); }, 20000);
   }
 
+  // Банер cookies (fixed унизу) лежав би над календарем і перехоплював натискання — напр. кнопку «Підтвердити» на телефоні
+  // (крізь напівпрозоре скло кнопку видно, а натискання дістається банеру). Поки відкритий календар, банер не показуємо
+  // (і тоді, коли site.js показує його із затримкою); вибору не зроблено — діють типові налаштування без згоди,
+  // банер з'явиться на наступній сторінці, або його відкриває «Налаштування cookies» у футері.
+  const consent = document.querySelector('[data-consent]');
+  let consentByUser = false;
+  const calendarOpen = () => !!(current && current.calLink && !step2.hidden && done.hidden);
+  function keepConsentAway() {
+    if (consent && !consent.hidden && !consentByUser && calendarOpen()) { consent.hidden = true; dbg('банер cookies сховано, щоб не закривав календар'); }
+  }
+  if (consent) {
+    new MutationObserver(keepConsentAway).observe(consent, { attributes: true, attributeFilter: ['hidden'] });
+    document.addEventListener('click', (e) => { if (e.target.closest('[data-consent-open]')) consentByUser = true; }, true);
+  }
+
   function openCalendar(service) {
     let entry = embeds.get(service.id);
     if (!entry) {
@@ -224,6 +244,18 @@
       const ready = () => { entry.ready = true; entry.failed = false; if (current === service) showStatus(entry); refreshLayout(); };
       api('on', { action: 'linkReady', callback: ready });
       api('on', { action: 'linkFailed', callback: () => { entry.failed = true; if (current === service) showStatus(entry); } });
+      if (DEBUG) {
+        // «*» — усі події цього календаря (формат: window CustomEvent `CAL:<ns>:<type>`, detail = { type, namespace, fullType, data })
+        api('on', { action: '*', callback: (e) => dbg(`${ns} подія`, e.detail && e.detail.type, e.detail && e.detail.data) });
+        if ('ResizeObserver' in window) {
+          let last = 0;
+          new ResizeObserver(() => {
+            const f = box.querySelector('iframe');
+            const h = f ? Math.round(f.getBoundingClientRect().height) : 0;
+            if (h !== last) { dbg(`${ns} висота iframe: ${last} → ${h}px`); last = h; }
+          }).observe(box);
+        }
+      }
       api('on', { action: 'bookingSuccessfulV2', callback: (e) => onBooked(service, entry, e) });
       api('on', { action: 'bookingSuccessful', callback: (e) => onBooked(service, entry, e) });
     }
@@ -271,6 +303,7 @@
     if (service.calLink) openCalendar(service);
     else { embeds.forEach((x) => { x.box.hidden = true; }); showStatus(null); }
     reveal();
+    keepConsentAway();
     // Адреса з обраною послугою — щоб можна було поділитися чи оновити сторінку
     try {
       const url = new URL(location.href);
