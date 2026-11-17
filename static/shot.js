@@ -15,6 +15,7 @@
 // --intro    — показати інтро першого входу (за замовчуванням воно пропускається, щоб знімати саму сторінку).
 // --wait=N   — почекати ще N мс перед знімком (напр. поки завантажиться календар Cal.com на /book).
 //              Адресу можна вказати з параметрами: node static/shot.js "/book/?service=recording" 390
+// --eval=JS  — виконати JS на сторінці перед знімком (можна з await), напр. емулювати подію; далі ще 1,5 с паузи.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -131,6 +132,12 @@ try {
           await w(1500); scrollTo(0, 0); window.wrMotion?.lenis?.scrollTo(0, { immediate: true }); await w(600); })()`,
         awaitPromise: true,
       });
+    }
+    const evalJs = (flag('eval') || '').split('=').slice(1).join('=');
+    if (evalJs) {
+      const { exceptionDetails } = await send('Runtime.evaluate', { expression: `(async () => { ${evalJs} })()`, awaitPromise: true });
+      if (exceptionDetails) throw new Error(`--eval: ${exceptionDetails.exception?.description || exceptionDetails.text}`);
+      await sleep(1500);
     }
     if (hover) {
       const { result: pos } = await send('Runtime.evaluate', {

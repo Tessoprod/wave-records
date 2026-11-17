@@ -494,6 +494,9 @@ export function calBookPage({ services, texts = {} }) {
     services: services.map((s) => ({ id: s.id, name: s.name, price: s.price, duration: s.duration, calLink: s.calLink })),
     texts: { loading: t.loading, error: t.error },
   };
+  const ok = t.success || {};
+  const address = [c.address, c.city].filter(Boolean).join(', ');
+  data.success = { event_title: ok.event_title, hour: ok.hour, min: ok.min, location: [c.studio, address].filter(Boolean).join(', ') };
   const how = Array.isArray(t.how) ? t.how.filter((it) => it && it.title) : [];
 
   const body = html`
@@ -542,7 +545,27 @@ export function calBookPage({ services, texts = {} }) {
           <a class="btn btn-neon" href="${tg}" rel="noopener" data-cta="book_stub_telegram">${t.stub_button}${icon.arrowUp}</a>
         </div>
       </div>
-      ${info.price_note ? html`<p class="book-note">${info.price_note}</p>` : ''}
+      ${info.price_note ? html`<p class="book-note" data-book-note>${info.price_note}</p>` : ''}
+
+      <!-- Екран успіху: замість підтвердження Cal.com (дані запису заповнює book-cal.js) -->
+      <div class="book-done glass glass-panel" data-book-done hidden tabindex="-1" aria-labelledby="book-done-title">
+        <span class="book-done-mark" aria-hidden="true"></span>
+        <h2 class="book-done-title" id="book-done-title">${ok.title}</h2>
+        ${ok.text ? html`<p class="book-done-lead">${ok.text}</p>` : ''}
+        <dl class="book-done-list">
+          <div><dt>${ok.service}</dt><dd data-done-service></dd></div>
+          <div data-done-when hidden><dt>${ok.date}</dt><dd data-done-date></dd></div>
+          <div data-done-when hidden><dt>${ok.time}</dt><dd data-done-time></dd></div>
+          <div data-done-dur hidden><dt>${ok.duration}</dt><dd data-done-duration></dd></div>
+          <div class="book-done-addr"><dt>${ok.address}</dt><dd><span>${address}</span><a class="text-link" href="${mapsUrl(c)}" rel="noopener" target="_blank" data-cta="book_done_map">${ok.map_link}${icon.arrowUp}</a></dd></div>
+        </dl>
+        <div class="book-done-actions" data-done-when hidden>
+          <a class="btn btn-glass" href="#" rel="noopener" target="_blank" data-done-google data-cta="book_done_google">${ok.google}</a>
+          <button type="button" class="btn btn-glass" data-done-ics>${ok.ics}</button>
+        </div>
+        ${ok.manage ? html`<p class="book-done-manage">${ok.manage}</p>` : ''}
+        <a class="btn btn-neon" href="${tg}" rel="noopener" data-cta="book_done_telegram">${ok.telegram}${icon.arrowUp}</a>
+      </div>
     </section>
   </div>
 

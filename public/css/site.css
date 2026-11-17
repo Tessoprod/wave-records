@@ -1015,6 +1015,26 @@ html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 .book-stub-text { font-size: clamp(17px, 1.5vw, 20px); color: var(--ink-2); max-width: 30em; text-wrap: balance; }
 .book-note { margin-top: 16px; color: var(--ink-3); font-size: 15px; max-width: 52em; }
 
+/* Екран успіху після запису (замість підтвердження Cal.com) */
+.book-done { display: flex; flex-direction: column; align-items: center; text-align: center; padding: clamp(36px, 5vw, 64px) clamp(20px, 5vw, 64px); outline: none; }
+.book-done-mark { position: relative; width: 64px; height: 64px; border-radius: 50%; border: 1.5px solid rgba(var(--pink-rgb), .7); box-shadow: 0 0 34px -6px rgba(var(--pink-rgb), .35), inset 0 0 18px -8px rgba(var(--pink-rgb), .35); margin-bottom: 26px; animation: book-done-pop .7s var(--ease-spring) .15s both; }
+.book-done-mark::after { content: ''; position: absolute; left: 50%; top: 46%; width: 13px; height: 24px; border: solid var(--pink); border-width: 0 2.5px 2.5px 0; transform: translate(-50%, -50%) rotate(45deg); animation: book-done-check .45s var(--ease-spring) .45s both; }
+@keyframes book-done-pop { from { opacity: 0; transform: scale(.5); } to { opacity: 1; transform: none; } }
+@keyframes book-done-check { from { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scale(.4); } to { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scale(1); } }
+.book-done-title { font-family: var(--font-display); font-weight: 900; font-synthesis: none; text-transform: uppercase; letter-spacing: -.015em; font-size: clamp(32px, 4.2vw, 56px); line-height: 1; text-wrap: balance; }
+.book-done-lead { margin-top: 16px; color: var(--ink-2); font-size: clamp(16px, 1.4vw, 19px); max-width: 30em; text-wrap: balance; }
+.book-done-list { width: 100%; max-width: 620px; margin: clamp(28px, 3.5vw, 40px) 0 0; text-align: left; border-top: 1px solid var(--line); }
+.book-done-list > div { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 16px; padding: 15px 4px; border-bottom: 1px solid var(--line); }
+.book-done-list > div[hidden] { display: none; }
+.book-done-list dt { color: var(--ink-3); font-size: 14px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding-top: 2px; }
+.book-done-list dd { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.book-done-addr dd { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.book-done-addr .text-link { font-size: 15px; font-weight: 500; }
+.book-done-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 28px; }
+.book-done-actions[hidden] { display: none; }
+.book-done-manage { margin: 26px 0 22px; color: var(--ink-3); font-size: 15px; max-width: 30em; text-wrap: balance; }
+.book-done-actions + .book-done-manage { margin-top: 22px; }
+
 /* Як це відбувається */
 .book-how { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .book-how-item { display: flex; flex-direction: column; gap: 12px; min-height: 230px; }
@@ -1035,6 +1055,9 @@ html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   .book-cal-spin i { animation: none; transform: scaleY(.6); }
+  .book-done-mark { animation: none; }
+  .book-done-mark::after { animation-name: book-fade-in; }
+  @keyframes book-fade-in { from { opacity: 0; } to { opacity: 1; } }
 }
 
 /* ---------- Юридичні сторінки ---------- */
@@ -1590,6 +1613,10 @@ html.from-menu::view-transition-group(vt-curtain) { display: none; }
   .book-how-item { min-height: 0; }
   .book-how-item .num { padding-bottom: 8px; }
   .book-chosen .book-change { width: 100%; }
+  .book-done-list > div { grid-template-columns: 1fr; gap: 4px; padding: 13px 2px; }
+  .book-done-list dt { font-size: 13px; padding-top: 0; }
+  .book-done-actions, .book-done > .btn-neon { width: 100%; }
+  .book-done-actions .btn, .book-done > .btn-neon { flex: 1 1 100%; width: 100%; justify-content: center; }
 }
 @media (max-width: 370px) {
   .book-svc { padding: 16px 14px; }
