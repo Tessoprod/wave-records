@@ -1,8 +1,8 @@
 {
   "_help": "Онлайн-запис через Cal.com (сторінка /book). cal_username — ваше ім'я на Cal.com (з адреси cal.com/ІМ'Я). event_types — послуги, на які можна записатися онлайн, у порядку показу: ключ — id послуги з services.json, значення — тип запису Cal.com: коротка назва (напр. «recording» → cal.com/ІМ'Я/recording), «ім'я/назва» або повне посилання https://cal.com/…. Поки значення порожнє, замість календаря показується кнопка «Записатися в Telegram». Назву, тривалість і ціну послуги сайт бере з services.json.",
-  "cal_username": "",
+  "cal_username": "waverecords",
   "event_types": {
-    "recording": "",
+    "recording": "record",
     "wave-plus": "",
     "wave-pro": "",
     "vocal-mixing": "",

@@ -341,7 +341,7 @@ function blocks() {
   const groups = motion.stage ? '.svc-full-grid, .phil-grid, .bento, .book-info, .book-svc-grid, .book-how, .gallery, .chips' : '.svc-grid, .svc-full-grid, .phil-grid, .bento, .book-info, .book-svc-grid, .book-how, .gallery, .chips';
   cascade($$(`:is(${groups}) > *`));
   cascade($$('.faq-list > .faq-item'), { y: 24, stagger: 0.06 });
-  $('.cta-band, .tl-text, .empty-state').forEach((el) => cascade([el], { y: 30 }));
+  $$('.cta-band, .tl-text, .empty-state').forEach((el) => cascade([el], { y: 30 }));
 
   // Треки в'їжджають по черзі, хвиля промальовується зліва направо
   cascade($$('.tracks > .track'), {

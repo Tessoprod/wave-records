@@ -215,7 +215,11 @@
       }
       Cal('init', ns, { origin: CAL_ORIGIN });
       const api = Cal.ns[ns];
-      api('inline', { elementOrSelector: `#${box.id}`, calLink: service.calLink, config: { layout: 'month_view', theme: 'dark' } });
+      // Опис події сховано (hideEventTypeDetails), але вибір тривалості (1–4 год) і часовий пояс лишаються видимими
+      api('inline', {
+        elementOrSelector: `#${box.id}`, calLink: service.calLink,
+        config: { layout: 'month_view', theme: 'dark', showEventDurationWhenEventDetailsHidden: 'true', showTimezoneWhenEventDetailsHidden: 'true' },
+      });
       api('ui', calTheme());
       const ready = () => { entry.ready = true; entry.failed = false; if (current === service) showStatus(entry); refreshLayout(); };
       api('on', { action: 'linkReady', callback: ready });
