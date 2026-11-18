@@ -495,7 +495,7 @@ export function calBookPage({ services, texts = {}, groups = {} }) {
     services: services.map((s) => ({ id: s.id, name: s.name, price: s.price, duration: s.duration, calLink: s.calLink, package: s.package })),
     texts: {
       loading: t.loading, placeholder: t.picker_placeholder, count: t.picker_count, step_time: t.step_time, step_remote: t.step_remote,
-      calendar_for: t.calendar_for, remote_one: t.remote_one, remote_many: t.remote_many,
+      remote_one: t.remote_one, remote_many: t.remote_many, notes: t.notes_prefill,
     },
   };
   const ok = t.success || {};
@@ -555,29 +555,33 @@ export function calBookPage({ services, texts = {}, groups = {} }) {
     <!-- Крок 2 з'являється, коли обрано хоча б одну послугу -->
     <section class="book-step book-time" id="book-time" aria-labelledby="book-h-time" hidden data-book-time>
       <header class="book-step-head"><span class="book-step-num" aria-hidden="true">02</span><h2 class="book-step-title" id="book-h-time" tabindex="-1">${t.step_time}</h2></header>
-      <div class="book-chosen glass">
+      <div class="book-chosen">
         <div class="book-chosen-head">
           <p class="book-chosen-label">${t.selected}</p>
           <button type="button" class="btn btn-glass btn-sm book-change" data-book-change>${icon.chevL}<span>${t.change}</span></button>
         </div>
-        <ul class="book-chosen-list" role="list">
+        <!-- Картки — така сама розмітка, як на сторінці «Послуги» (servicesPage), замість кнопки замовлення — «Прибрати» -->
+        <ul class="book-cards" role="list">
           ${services.map((s) => html`
-          <li class="book-chosen-item" data-chosen="${s.id}" hidden>
-            <div class="book-chosen-text">
-              <p class="book-chosen-name">${s.name}</p>
-              <p class="book-chosen-meta">${meta(s)}</p>
-              ${s.description ? html`<p class="book-chosen-desc">${s.description}</p>` : ''}
+          <li class="svc-full glass glass-card book-card" data-chosen="${s.id}" hidden>
+            <div class="svc-full-top">
+              <h3 class="svc-name">${s.name}</h3>
+              <p class="svc-price${/\d/.test(s.price) ? '' : ' svc-price-text'}">${s.price}</p>
             </div>
-            <button type="button" class="book-chosen-x" data-unpick="${s.id}" aria-label="${t.remove}: ${s.name}">${icon.close}</button>
+            ${s.duration ? html`<p class="book-card-dur">${icon.clock}${s.duration}</p>` : ''}
+            ${s.description ? html`<p class="svc-desc">${s.description}</p>` : ''}
+            <div class="svc-full-cta">
+              <button type="button" class="btn btn-glass btn-sm" data-unpick="${s.id}" aria-label="${t.remove}: ${s.name}">${t.remove}${icon.close}</button>
+            </div>
           </li>`)}
         </ul>
       </div>
 
       <!-- Календарі Cal.com — по одному на кожну обрану послугу із записом у студії (додає book-cal.js) -->
+      <div class="book-cal-tabs glass" role="tablist" aria-label="${t.calendar_switch}" data-cal-tabs hidden></div>
       <div class="book-cals" data-book-cals></div>
       <template data-cal-template>
-        <div class="book-cal-sec">
-          <h3 class="book-cal-title" data-cal-title></h3>
+        <div class="book-cal-sec" role="tabpanel">
           <div class="book-cal glass glass-panel" data-book-cal data-lenis-prevent>
             <div class="book-cal-status" data-book-loading hidden>
               <span class="book-cal-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>

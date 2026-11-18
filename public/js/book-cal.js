@@ -222,7 +222,7 @@
     fillDone(el, entry.booking);
     entry.done = el;
     entry.cal.replaceWith(el);
-    $('[data-cal-title]', entry.sec).hidden = true;
+    renderTabs();
     fade(el, reduce ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(24px) scale(.98)' }, { opacity: 1, transform: 'none' }], 800);
     refreshLayout();
     scrollToEl(entry.sec, -24);
@@ -289,8 +289,10 @@
     box.id = `book-cal-${ns}`;
     box.dataset.calNs = ns;
     calEl.appendChild(box);
-    $('[data-cal-title]', sec).textContent = (T.calendar_for || '{service}').replace('{service}', service.name);
-    const entry = { service, sec, cal: calEl, box, ready: false, failed: false, booked: false, booking: null, done: null, timer: 0 };
+    sec.id = `book-cal-sec-${ns}`;
+    // Примітки бронювання: назви обраних дистанційних послуг — щоб студія бачила весь набір
+    const notes = notesText();
+    const entry = { service, sec, cal: calEl, box, notes, ready: false, failed: false, booked: false, booking: null, done: null, timer: 0 };
     embeds.set(service.id, entry);
     placeSections();
     const Cal = calApi();
@@ -302,11 +304,11 @@
     }
     Cal('init', ns, { origin: CAL_ORIGIN });
     const api = Cal.ns[ns];
-    // Опис події сховано (hideEventTypeDetails), але вибір тривалості й часовий пояс лишаються видимими
-    api('inline', {
-      elementOrSelector: `#${box.id}`, calLink: service.calLink,
-      config: { layout: 'month_view', theme: 'dark', showEventDurationWhenEventDetailsHidden: 'true', showTimezoneWhenEventDetailsHidden: 'true' },
-    });
+    // Опис події сховано (hideEventTypeDetails), але вибір тривалості й часовий пояс лишаються видимими.
+    // notes — передзаповнення поля «Additional notes» форми бронювання (Cal.com бере його з config, як параметр адреси)
+    const config = { layout: 'month_view', theme: 'dark', showEventDurationWhenEventDetailsHidden: 'true', showTimezoneWhenEventDetailsHidden: 'true' };
+    if (notes) config.notes = notes;
+    api('inline', { elementOrSelector: `#${box.id}`, calLink: service.calLink, config });
     api('ui', calTheme());
     api('on', { action: 'linkReady', callback: () => { entry.ready = true; entry.failed = false; showStatus(entry); refreshLayout(); } });
     api('on', { action: 'linkFailed', callback: () => { entry.failed = true; showStatus(entry); } });
@@ -328,17 +330,86 @@
     return entry;
   }
 
-  // Секції календарів — у порядку послуг; видно лише обрані
+  // Секції календарів — у порядку послуг; видно лише календар активної вкладки (activeCal)
+  const tabs = $('[data-cal-tabs]');
+  let activeCal = '';
+  const shownCals = () => order.filter((id) => picked.has(id) && embeds.has(id));
   function placeSections() {
+    const shown = shownCals();
+    if (!shown.includes(activeCal)) activeCal = shown[0] || '';
     order.forEach((id) => {
       const x = embeds.get(id);
       if (!x) return;
-      x.sec.hidden = !picked.has(id);
-      calsBox.appendChild(x.sec);
+      x.sec.hidden = id !== activeCal;
+      if (x.sec.parentNode !== calsBox) calsBox.appendChild(x.sec);
     });
-    // Заголовок «Дата й час: …» потрібен, лише коли календарів кілька
-    const shown = [...embeds.values()].filter((x) => !x.sec.hidden);
-    shown.forEach((x) => { $('[data-cal-title]', x.sec).hidden = !!x.done || shown.length < 2; });
+    renderTabs();
+  }
+  // Перемикач між календарями — коли обрано кілька послуг із календарем («Година запису» і пакет)
+  function renderTabs() {
+    const shown = shownCals();
+    tabs.hidden = shown.length < 2;
+    if (tabs.hidden) { tabs.replaceChildren(); return; }
+    tabs.replaceChildren(...shown.map((id) => {
+      const x = embeds.get(id);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'book-cal-tab';
+      b.setAttribute('role', 'tab');
+      b.id = `book-tab-${id}`;
+      b.dataset.tab = id;
+      b.setAttribute('aria-selected', String(id === activeCal));
+      b.setAttribute('aria-controls', x.sec.id);
+      b.tabIndex = id === activeCal ? 0 : -1;
+      b.textContent = x.service.name;
+      if (x.booked) b.classList.add('is-booked');
+      x.sec.setAttribute('aria-labelledby', b.id);
+      return b;
+    }));
+  }
+  function selectTab(id, focus = false) {
+    if (id === activeCal || !embeds.has(id)) return;
+    activeCal = id;
+    placeSections();
+    appear(embeds.get(id).sec, 12, 450);
+    if (focus) $(`[data-tab="${id}"]`, tabs)?.focus({ preventScroll: true });
+    keepConsentAway();
+    refreshLayout();
+  }
+  tabs.addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) selectTab(b.dataset.tab); });
+  tabs.addEventListener('keydown', (e) => {
+    const list = shownCals();
+    const i = list.indexOf(activeCal);
+    const go = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: list.length - 1 }[e.key];
+    if (go === undefined) return;
+    e.preventDefault();
+    selectTab(list[(go + list.length) % list.length], true);
+  });
+
+  // Текст приміток для Cal.com: «Також обрано (дистанційно): …»; без дистанційних послуг — порожньо
+  function notesText() {
+    const names = order.filter((id) => picked.has(id) && !byId.get(id).calLink).map((id) => byId.get(id).name);
+    return names.length ? (T.notes || '{services}').replace('{services}', names.join(', ')) : '';
+  }
+  // Набір дистанційних послуг змінився — календарі, де ще не записались, перебудовуються з новими примітками
+  // (передзаповнення Cal.com задається лише при створенні). Поки список відкритий — чекаємо, щоб не перебудовувати
+  // на кожну галочку
+  let notesTimer = 0;
+  function syncNotes() {
+    clearTimeout(notesTimer);
+    notesTimer = setTimeout(() => {
+      if (!panel.hidden) { syncNotes(); return; }
+      const text = notesText();
+      embeds.forEach((x, id) => {
+        if (x.booked || x.notes === text) return;
+        dbg('примітки змінились — календар перебудовується', id, text);
+        clearTimeout(x.timer);
+        x.sec.remove();
+        embeds.delete(id);
+        if (picked.has(id)) createCalendar(x.service);
+      });
+      placeSections();
+    }, 600);
   }
 
   /* ---------- Крок 2: обрані послуги ---------- */
@@ -351,6 +422,7 @@
     boxes.forEach((b) => { b.checked = picked.has(b.value); });
     pickerSummary();
     placeSections();
+    syncNotes();
     const rem = ids.map((id) => byId.get(id)).filter((s) => !s.calLink);
     remote.hidden = !rem.length;
     remoteText.textContent = (rem.length > 1 && T.remote_many) || T.remote_one || '';
@@ -385,6 +457,7 @@
     // Записаний календар більше не показуємо: повторний вибір послуги відкриває новий
     if (entry && entry.booked) { entry.sec.remove(); embeds.delete(id); entry = null; }
     if (service.calLink && !entry) createCalendar(service);
+    if (service.calLink) activeCal = id; // щойно обрана послуга з календарем — її вкладка
     render();
     const sec = embeds.get(id)?.sec;
     if (sec && !sec.hidden) appear(sec, 16, 500);
@@ -419,9 +492,10 @@
     const s = byId.get(id);
     if (picked.has(id) || (s.package && packageTaken())) return;
     picked.add(id);
-    if (s.calLink) createCalendar(s);
     track('booking_service_select', { service: s.name, service_id: id, source: 'url' });
   });
+  // Календарі — коли відомий увесь набір (примітки з дистанційними послугами одразу правильні)
+  order.forEach((id) => { if (picked.has(id) && byId.get(id).calLink) createCalendar(byId.get(id)); });
   render();
   if (picked.size) {
     Promise.resolve(window.wrMotion?.entered).then(() => setTimeout(() => {

@@ -1,11 +1,12 @@
 {
-  "_help": "Онлайн-запис через Cal.com (сторінка /book). На сторінці — усі послуги з services.json у групах (Sound, Media | PR, BUSINESS); можна обрати кілька. cal_username — ваше ім'я на Cal.com (з адреси cal.com/ІМ'Я). event_types — послуги із записом на дату в студії: ключ — id послуги з services.json, значення — тип запису Cal.com: коротка назва (напр. «record» → cal.com/ІМ'Я/record), «ім'я/назва» або повне посилання https://cal.com/…. Для них показується календар; решта послуг — дистанційні (текст remote_* і кнопка Telegram). packages — id пакетів: з них можна обрати лише один за раз. Назву, тривалість, ціну й опис сайт бере з services.json. Послуги без id у services.json (Media | PR, BUSINESS) мають id «media-1», «business-2»… за порядком.",
+  "_help": "Онлайн-запис через Cal.com (сторінка /book). На сторінці — усі послуги з services.json у групах (Sound, Media | PR, BUSINESS); можна обрати кілька. cal_username — ваше ім'я на Cal.com (з адреси cal.com/ІМ'Я). event_types — послуги із записом на дату в студії: ключ — id послуги з services.json, значення — тип запису Cal.com: коротка назва (напр. «record» → cal.com/ІМ'Я/record), «ім'я/назва» або повне посилання https://cal.com/…. Для них показується календар; решта послуг — дистанційні (текст remote_* і кнопка Telegram; їхні назви передаються в примітки бронювання Cal.com — notes_prefill). packages — id пакетів: з них можна обрати лише один за раз. Назву, тривалість, ціну й опис сайт бере з services.json. Послуги без id у services.json (Media | PR, BUSINESS) мають id «media-1», «business-2»… за порядком.",
   "cal_username": "waverecords",
   "event_types": {
     "recording": "record",
     "wave-plus": "wave-plus",
     "wave-pro": "wave-pro"
   },
+  "_packages_help": "Пакети — послуги, з яких можна обрати лише одну за раз. Якщо поле прибрати, пакетами вважаються послуги, назва яких починається зі слова «Пакет».",
   "packages": [
     "wave-plus",
     "wave-pro"
@@ -24,10 +25,11 @@
     "selected": "Ви обрали",
     "change": "Змінити послуги",
     "remove": "Прибрати",
-    "calendar_for": "Дата й час: {service}",
-    "remote_one": "Ця послуга робиться дистанційно, тому Вашої присутності не потрібно, всі деталі обговоримо в Telegram.",
-    "remote_many": "Ці послуги робляться дистанційно, тому Вашої присутності не потрібно, всі деталі обговоримо в Telegram.",
-    "remote_button": "Обговорити в Telegram",
+    "calendar_switch": "На що записатися",
+    "notes_prefill": "Також обрано (дистанційно): {services}",
+    "remote_one": "Ця послуга робиться дистанційно, тому Вашої присутності не потрібно, всі деталі обговоримо в Telegram",
+    "remote_many": "Ці послуги робляться дистанційно, тому Вашої присутності не потрібно, всі деталі обговоримо в Telegram",
+    "remote_button": "Написати в Telegram",
     "loading": "Завантажуємо календар…",
     "error": "Календар не завантажився.",
     "error_link": "Відкрити запис в окремій вкладці",

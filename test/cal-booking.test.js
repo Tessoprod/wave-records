@@ -43,6 +43,9 @@ test('bookingServices: усі послуги з усіх блоків, кале�
   const bad = bookingServices({ cal_username: '', event_types: { nope: 'x', distribution: 'd', recording: 'rec' }, packages: ['zzz'] }, catalog);
   assert.equal(bad.issues.length, 4);
   assert.equal(bookingServices({ event_types: [] }, catalog).issues.length, 1);
+  // Без поля packages пакети — за назвою «Пакет …»
+  const auto = bookingServices({ cal_username: 'wave', event_types: {} }, catalog);
+  assert.deepEqual(auto.services.filter((s) => s.package).map((s) => s.id), ['wave-plus']);
   // Старий виклик — лише блок sound
   assert.equal(bookingServices({ cal_username: 'wave', event_types: { recording: 'rec' } }, catalog.sound).services.length, 4);
 });

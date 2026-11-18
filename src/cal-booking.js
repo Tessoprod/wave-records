@@ -34,7 +34,7 @@ export const serviceId = (s, group, i) => (s && /^[a-z0-9-]+$/i.test(s.id || '')
  * catalog — увесь services.json ({ sound, media, business }) або (як раніше) лише масив блоку sound.
  * На сторінці запису — усі послуги з усіх блоків (у групах, як на сторінці Послуг). Календар Cal.com — лише в тих,
  * що є в event_types з заповненим значенням (запис на дату в студії); решта — дистанційні, деталі в Telegram.
- * packages — id пакетів, з яких можна обрати лише один.
+ * packages — id пакетів, з яких можна обрати лише один; без поля — послуги, назва яких починається зі слова «Пакет».
  * Повертає { services: [{ id, group, name, price, duration, description, calLink, package }], issues: [...] }.
  */
 export const GROUPS = ['sound', 'media', 'business'];
@@ -46,7 +46,8 @@ export function bookingServices(booking, catalog = {}) {
   if (!types || typeof types !== 'object' || Array.isArray(types)) return { services: [], issues: [`поле «event_types» має бути об'єктом { "id послуги": "тип запису Cal.com" }`] };
   const user = String(booking.cal_username || '').trim();
   if (user && !SLUG.test(user.replace(/^@/, ''))) issues.push(`cal_username «${user}» — лише латинські літери, цифри, крапка, дефіс і підкреслення`);
-  const packages = booking.packages === undefined ? [] : booking.packages;
+  const byName = booking.packages === undefined;
+  const packages = byName ? [] : booking.packages;
   if (!Array.isArray(packages)) issues.push('поле «packages» має бути списком id послуг-пакетів');
   const services = [];
   for (const group of GROUPS) {
@@ -56,7 +57,7 @@ export function bookingServices(booking, catalog = {}) {
       if (services.some((x) => x.id === id)) { issues.push(`services.json: id «${id}» повторюється`); return; }
       services.push({
         id, group, name: String(s.name), price: String(s.price || ''), duration: String(s.duration || ''),
-        description: String(s.description || ''), calLink: '', package: Array.isArray(packages) && packages.includes(id),
+        description: String(s.description || ''), calLink: '', package: byName ? /^пакет\s/i.test(String(s.name)) : Array.isArray(packages) && packages.includes(id),
       });
     });
   }

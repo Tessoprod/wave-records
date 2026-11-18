@@ -1032,20 +1032,29 @@ html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 }
 
 /* Крок 2: обрані послуги, календарі й дистанційні послуги */
-.book-chosen { padding: 18px 18px 6px 26px; border-radius: var(--r-lg); margin-bottom: 14px; }
+.book-chosen { margin-bottom: 22px; }
+/* Обрані послуги — картки сторінки «Послуги» (.svc-full), та сама сітка; контейнер свій: у .svc-full-grid
+   картки ховає стартовий стан анімацій (html.wr-anim), а тут вони з'являються вже після завантаження */
+.book-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 14px; }
+.book-card { min-height: 0; }
+.book-card-dur { display: inline-flex; align-items: center; gap: 8px; margin-top: -6px; color: var(--ink-2); font-size: 15px; font-weight: 500; }
+.book-card-dur .i { width: 16px; height: 16px; color: var(--ink-3); }
+.book-card .svc-full-cta .btn .i { width: 14px; height: 14px; }
 .book-chosen-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 8px; }
 .book-chosen-label { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
-.book-chosen-item { display: flex; align-items: flex-start; gap: 16px; padding: 16px 0; border-top: 1px solid var(--line); }
-.book-chosen-text { flex: 1; min-width: 0; }
-.book-chosen-name { font-size: clamp(18px, 1.5vw, 21px); font-weight: 700; line-height: 1.25; }
-.book-chosen-meta { color: var(--ink-2); font-size: 15px; margin-top: 2px; }
-.book-chosen-desc { color: var(--ink-2); font-size: 15px; line-height: 1.5; margin-top: 8px; max-width: 62em; }
-.book-chosen-x { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line); background: none; color: var(--ink-2); cursor: pointer; transition: color .2s, border-color .2s; }
-.book-chosen-x .i { width: 18px; height: 18px; }
-@media (hover: hover) and (pointer: fine) { .book-chosen-x:hover { color: var(--white); border-color: rgba(var(--pink-rgb), .5); } }
 .book-change { flex: none; }
-.book-cals { display: flex; flex-direction: column; gap: 22px; }
-.book-cal-title { font-size: clamp(17px, 1.4vw, 20px); font-weight: 700; margin: 6px 0 12px 4px; }
+.book-cals { display: flex; flex-direction: column; }
+/* Перемикач між календарями («Година запису» ↔ пакет): скляна пігулка з вкладками, активна — неонова */
+.book-cal-tabs { display: flex; gap: 6px; width: fit-content; max-width: 100%; padding: 6px; margin-bottom: 14px; border-radius: 999px; overflow-x: auto; scrollbar-width: none; }
+.book-cal-tab {
+  flex: none; min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: none; color: var(--ink-2);
+  font: inherit; font-size: 15px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: color .25s, background-color .25s, box-shadow .3s;
+  -webkit-tap-highlight-color: transparent;
+}
+.book-cal-tab[aria-selected="true"] { background-color: var(--pink); color: var(--black); box-shadow: 0 0 20px -4px rgba(var(--pink-rgb), .35); }
+.book-cal-tab.is-booked::after { content: ' ✓'; }
+.book-cal-tab:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .book-cal-tab:not([aria-selected="true"]):hover { color: var(--white); background-color: rgba(245, 245, 245, .06); } }
 .book-remote { margin-top: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 18px; padding: clamp(24px, 3vw, 36px); }
 .book-cals:has(> :not([hidden])) ~ .book-remote { margin-top: 22px; }
 .book-remote-text { font-size: clamp(17px, 1.5vw, 20px); line-height: 1.45; max-width: 36em; text-wrap: pretty; }
@@ -1654,7 +1663,6 @@ html.from-menu::view-transition-group(vt-curtain) { display: none; }
   .book-picker-scroll { padding: 4px 6px 8px; }
   .book-opt { padding: 12px 10px; gap: 12px; }
   .book-opt-input { left: 10px; top: 14px; }
-  .book-chosen { padding: 16px 14px 4px 18px; }
   .book-cal { padding: 0; border-radius: var(--r-lg); }
   .book-cal-embed iframe { border-radius: var(--r-lg); }
   .book-contacts { grid-template-columns: 1fr; }
@@ -1665,6 +1673,8 @@ html.from-menu::view-transition-group(vt-curtain) { display: none; }
   .book-how-item { min-height: 0; }
   .book-how-item .num { padding-bottom: 8px; }
   .book-chosen .book-change { width: 100%; }
+  .book-cal-tabs { width: 100%; }
+  .book-cal-tab { flex: 1 1 0; padding: 0 12px; font-size: 14px; }
   .book-picker-foot .btn, .book-remote .btn { width: 100%; justify-content: center; }
   .book-opt-name { font-size: 16px; }
   .book-done-list > div { grid-template-columns: 1fr; gap: 4px; padding: 13px 2px; }
