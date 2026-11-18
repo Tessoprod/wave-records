@@ -142,21 +142,22 @@ function pageTitle() {
   if (!SplitText) gsap.to(el, { opacity: 1, duration: 0.8, ease: SOFT });
   else splitLines(el, false);
 }
-function headings() {
+// queue — як виконати роботу для кожного заголовка (за замовчуванням одразу; conductor() може розкласти її на частини)
+function headings(queue = (fn) => fn()) {
   $$('main .h1, main .h2').filter(notInDialog).filter((el) => el !== titleEl())
-    .filter((el) => !(motion.stage && el.closest('.svc-section'))).forEach((el) => {
+    .filter((el) => !(motion.stage && el.closest('.svc-section'))).forEach((el) => queue(() => {
     if (!SplitText) {
       gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: SOFT, scrollTrigger: onceAt(el, 'top 92%') });
       return;
     }
     splitLines(el);
-  });
-  $$('main .page-lead, main .sec-lead, main .sec-sub, main .chapter').filter(notInDialog).forEach((el) => {
+  }));
+  queue(() => $$('main .page-lead, main .sec-lead, main .sec-sub, main .chapter').filter(notInDialog).forEach((el) => {
     gsap.fromTo(el, { opacity: 0, y: 18 }, {
       opacity: 1, y: 0, duration: 0.9, ease: SOFT, delay: 0.1, clearProps: 'transform',
       scrollTrigger: onceAt(el, 'top 94%'),
     });
-  });
+  }));
 }
 // Вміст без власної анімації (текст юридичних сторінок, кнопки, фото, футер) — м'яке проявлення.
 // Прозорість лишається вбудованою (opacity: 1): інакше знову спрацює приховане правило з site.css
@@ -512,7 +513,11 @@ function marquees() {
     let x = 0;
     let dir = -1;
     let boost = 0;
-    let lastY = scrollY;
+    // Прокрутка — з події scroll: читання scrollY у кожному кадрі змушувало браузер перераховувати розкладку посеред
+    // кадру, якщо розмітка щойно змінилась (поділ заголовків на рядки, поява першого екрана) — ривки
+    let y = scrollY;
+    addEventListener('scroll', () => { y = scrollY; }, { passive: true });
+    let lastY = y;
     let visible = false;
     // Ширину одного набору слів міряємо лише при зміні розміру, а не щокадру
     let w = set.offsetWidth;
@@ -521,8 +526,8 @@ function marquees() {
     new IntersectionObserver(([en]) => { visible = en.isIntersecting; }).observe(m);
     gsap.ticker.add((time, deltaMs) => {
       const dt = Math.min(0.05, deltaMs / 1000);
-      const v = (scrollY - lastY) / Math.max(dt, 0.001); // px/с
-      lastY = scrollY;
+      const v = (y - lastY) / Math.max(dt, 0.001); // px/с
+      lastY = y;
       if (!visible) return;
       if (v > 5) dir = -1; else if (v < -5) dir = 1;
       boost += (Math.min(Math.abs(v) * 0.35, 900) - boost) * Math.min(1, dt * 6);
@@ -892,23 +897,52 @@ function splitCharsKerned(line) {
    плавні, навіть коли основний потік зайнятий 3D-сценою, що якраз стартує. Раніше GSAP міняв transform кожної літери
    з основного потоку, і на кожному кадрі великі літери з тінню перемальовувались — поява йшла ривками. */
 const RISE_EASE = 'cubic-bezier(.19, 1, .22, 1)'; // ≈ expo.out
-function rise(els, from, { duration, delay = 0, stagger = 0 }) {
-  return [...els].filter(Boolean).map((el, i) => el.animate?.([from, { opacity: 1, transform: 'none' }],
-    { duration: duration * 1000, delay: (delay + i * stagger) * 1000, easing: RISE_EASE, fill: 'backwards' })).filter(Boolean);
+// Затримка — частина самої анімації (утримання початкового кадру), а не delay: так усі анімації активні з першого
+// кадру й одразу йдуть окремими шарами; із delay кожна вмикалась пізніше окремо, і в ті кадри браузер перераховував
+// стилі й шари (на слабкому процесорі — ривок на ~0,37 с). Траєкторія й таймінг ті самі: easing на відрізку руху.
+// Прозорість 0 → 0,001 (оком не відрізнити): з нульовою браузер зовсім не малює елемент, і скляна кнопка
+// (backdrop-filter) уперше потрапляла на екран посеред руху — відеокарта компілювала для неї шейдер ~90 мс,
+// кадр пропускався. Так усе малюється з першого кадру, ще до того, як щось помітно рушить.
+function rise(els, from0, { duration, delay = 0, stagger = 0 }) {
+  const from = from0.opacity === 0 ? { ...from0, opacity: 0.001 } : from0;
+  return [...els].filter(Boolean).map((el, i) => {
+    const wait = (delay + i * stagger) * 1000;
+    const total = wait + duration * 1000;
+    const hold = wait / total;
+    const frames = hold > 0
+      ? [{ ...from, offset: 0 }, { ...from, offset: hold, easing: RISE_EASE }, { opacity: 1, transform: 'none' }]
+      : [{ ...from, easing: RISE_EASE }, { opacity: 1, transform: 'none' }];
+    return el.animate?.(frames, { duration: total, easing: 'linear' });
+  }).filter(Boolean);
 }
+// Рух першого екрана закінчився (або його немає) — для відкладеного запуску 3D-сцени без інтро
+let openHeroGate;
+const heroGate = new Promise((r) => { openHeroGate = r; });
 function heroIntro(still = false) {
   const intro = document.querySelector('[data-hero-intro]');
   const host = document.querySelector('[data-hero-scene]');
   const revealScene = () => host?.classList.add('is-ready');
-  if (!intro) { motion.heroReady?.then(revealScene); return; }
+  if (!intro) { openHeroGate(); motion.heroReady?.then(revealScene); return; }
   const show = () => { intro.classList.add('is-in'); motion.heroReady?.then(revealScene); };
-  if (!gsap || reduceMotion || still) { show(); return; }
+  if (!gsap || reduceMotion || still) { openHeroGate(); show(); return; }
   const line1 = intro.querySelector('.hero-l1');
   const rest = intro.querySelectorAll('.hero-l2, .hero-sub, .hero-ctas');
+  // Коли рух першого екрана закінчився — для conductor(): решту сторінки він готує вже після цього
+  // Перші кадри — початковий стан на паузі: браузер уперше малює рядки й кнопки (скло з backdrop-filter — компіляція
+  // шейдера на відеокарті до ~120 мс), і лише через три кадри, коли відеокарта це відмалювала, починається рух.
+  // Інакше ця пауза відеокарти припадала на перші кадри руху літер — помітний ривок на старті
+  const settle = (anims) => {
+    anims.forEach((a) => a.pause());
+    const play = (n) => requestAnimationFrame(() => (n ? play(n - 1) : anims.forEach((a) => a.play())));
+    play(2);
+    motion.heroMoved = Promise.allSettled(anims.map((a) => a.finished));
+    motion.heroMoved.then(openHeroGate);
+    return anims;
+  };
   {
     show();
     if (gentle(intro)) {
-      rise([line1, ...rest], { opacity: 0, transform: `translateY(${GENTLE_Y}px)` }, { duration: 0.8, stagger: 0.06 });
+      settle(rise([line1, ...rest], { opacity: 0, transform: `translateY(${GENTLE_Y}px)` }, { duration: 0.8, stagger: 0.06 }));
       return;
     }
     // На телефоні рядок не ділимо на літери: при поділі змінюється кернінг і ширина рядка (~2 px), а після анімації
@@ -918,8 +952,12 @@ function heroIntro(still = false) {
     const letters = split
       ? rise(split.chars, { opacity: 1, transform: 'translateY(110%)' }, { duration: 1.2, stagger: 0.035 })
       : rise([line1], { opacity: 0, transform: 'translateY(40px)' }, { duration: 1.1 });
-    rise(rest, { opacity: 0, transform: 'translateY(28px)' }, { duration: 1, delay: split ? 0.35 : 0.2, stagger: 0.1 });
-    if (split) Promise.all(letters.map((a) => a.finished)).then(() => split.revert(), () => split.revert());
+    const lines = rise(rest, { opacity: 0, transform: 'translateY(28px)' }, { duration: 1, delay: split ? 0.35 : 0.2, stagger: 0.1 });
+    settle([...letters, ...lines]);
+    // Літери повертаються в цілий рядок, коли браузер вільний: це зміна розмітки з перерахунком розкладки
+    // (на слабкому процесорі ~15 мс) — не в останньому кадрі руху. Літери стоять на тих самих місцях (splitCharsKerned),
+    // тож на екрані нічого не змінюється
+    if (split) motion.heroMoved.then(() => idle(() => split.revert(), 400));
   }
 }
 
@@ -1000,6 +1038,10 @@ async function heroScene() {
 }
 
 /* ---------- Запуск ---------- */
+// Коли браузер вільний (не пізніше timeout мс); fn отримує deadline з requestIdleCallback (або null)
+function idle(fn, timeout = 200) {
+  if ('requestIdleCallback' in window) requestIdleCallback((deadline) => fn(deadline), { timeout }); else setTimeout(() => fn(null), 16);
+}
 // Після першої відмальовки, коли браузер вільний (запасний варіант — setTimeout)
 function afterFirstPaint() {
   return revealed.then(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(() => {
@@ -1063,17 +1105,54 @@ async function conductor() {
   window.wrArmFailsafe?.();
   await fontsForTitle; // рядки ділимо за справжніми шрифтами (див. fontsForTitle)
   await motion.stageReady; // headings(), blocks() і plainFade() мають знати, чи працює сцена Послуг
+  // Головна: перший екран займає весь екран — решта сторінки нижче і поки невидима
+  const hero = document.querySelector('.hero [data-hero-intro]') && document.querySelector('.hero');
+  const heroFills = !!hero && hero.getBoundingClientRect().bottom >= innerHeight - 2;
+  // Вхід щойно завершився (інтро запускає Lenis, шторка — свій рух) — поява стартує з наступного кадру, окремою
+  // задачею: інакше перший кадр руху чекав на всю роботу кінця входу (на слабкому процесорі — 50+ мс)
+  await new Promise((r) => requestAnimationFrame(() => r()));
   heroIntro();
   pageTitle();
   // Решта — слідом за назвою, щоб рух був шаруватим
   await new Promise((r) => setTimeout(r, GENTLE ? 60 : titleEl() ? 300 : 120));
-  try { headings(); } catch (err) { console.error(err); showAll(); }
-  steps();
-  blocks();
-  about();
-  plainFade();
+  // Підготовка решти (поділ заголовків на рядки, твіни, ScrollTrigger) — це десятки мілісекунд основного потоку
+  // (×4 повільніший процесор — понад 300 мс). Посеред появи WAVE RECORDS вона крала кадри: ривок на ~0,13 с руху.
+  // На головній її невидно, поки перший екран не прокрутили, тож готуємо її, коли рух першого екрана закінчився
+  // (або одразу, щойно людина почала прокручувати), і частинами, з паузами між ними
+  const jobs = [];
+  headings((fn) => jobs.push(fn));
+  jobs.push(steps, blocks, about, plainFade);
+  if (heroFills && motion.heroMoved) {
+    await Promise.race([motion.heroMoved, scrollIntent()]);
+    await runIdle(jobs);
+  } else jobs.forEach(runJob);
   ScrollTrigger.sort();
   ScrollTrigger.refresh();
+}
+function runJob(fn) {
+  try { fn(); } catch (err) { console.error(err); showAll(); }
+}
+// Виконати роботи невеликими порціями, коли браузер вільний між кадрами (кожна — кілька мілісекунд),
+// не пізніше ніж за 150 мс на порцію; людина почала прокручувати — решта одразу
+function runIdle(jobs) {
+  return new Promise((resolve) => {
+    let rush = false;
+    scrollIntent().then(() => { rush = true; });
+    const tick = (deadline) => {
+      do runJob(jobs.shift());
+      while (jobs.length && (rush || (deadline && deadline.timeRemaining() > 6)));
+      if (jobs.length) idle(tick, 150); else resolve();
+    };
+    if (jobs.length) idle(tick, 150); else resolve();
+  });
+}
+// Людина почала прокручувати (колесо, дотик, клавіші, прокрутка) — проміс одразу виконується
+function scrollIntent() {
+  return new Promise((resolve) => {
+    const types = ['wheel', 'touchstart', 'keydown', 'scroll'];
+    const go = () => { types.forEach((t) => removeEventListener(t, go, true)); resolve(); };
+    types.forEach((t) => addEventListener(t, go, { capture: true, passive: true }));
+  });
 }
 
 // Запобіжник із <head> уже показав сторінку без анімації (клас wr-failsafe) — нічого не ховаємо повторно
@@ -1093,12 +1172,15 @@ try {
   gsap.registerPlugin(...[ScrollTrigger, SplitText].filter(Boolean));
   smoothScroll();
   homeLinks();
-  // 3D-сцена: під час інтро вантажиться одразу (лічильник показує її завантаження), інакше — після першої
-  // відмальовки, коли браузер вільний: текст і кнопки з'являються без затримки, сцена проявляється пізніше
+  // 3D-сцена: під час інтро вантажиться одразу (лічильник показує її завантаження) і проявляється разом із текстом.
+  // Без інтро (повторний візит, перехід з меню) — лише коли рух першого екрана закінчився (heroGate) або людина почала
+  // прокручувати: підготовка three.js і шейдерів — сотні мілісекунд основного потоку, перший рендер — до ~120 мс,
+  // і посеред появи WAVE RECORDS це були пропущені кадри (до 100 мс). Текст сцену не чекає, вона проявляється слідом
   const sceneHost = document.querySelector('[data-hero-scene]');
   if (sceneHost) {
     const start = () => heroScene().catch(() => sceneHost.classList.add('is-fallback'));
-    motion.heroReady = root.classList.contains('wr-intro') ? start() : afterFirstPaint().then(start);
+    const gate = () => Promise.race([heroGate, scrollIntent(), new Promise((r) => setTimeout(r, 6000))]);
+    motion.heroReady = root.classList.contains('wr-intro') ? start() : afterFirstPaint().then(gate).then(start);
   }
   motion.introDone = intro();
   motion.entered = reduceMotion ? Promise.resolve() : entrance();

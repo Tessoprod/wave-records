@@ -53,10 +53,15 @@
   const storedConsent = storage.get('wr_consent');
   if (storedConsent === 'all') loadPixel();
   if (consentBox) {
-    // Банер — лише після входу (інтро чи шторки з меню), щоб не з'являвся поверх них
+    // Банер — лише після входу (інтро чи шторки з меню), щоб не з'являвся поверх них, а на головній — ще й після
+    // руху першого екрана (wrMotion.heroMoved): поява банера перераховує стилі всієї сторінки, і посеред появи
+    // WAVE RECORDS це був пропущений кадр
     if (!storedConsent) {
       setTimeout(() => {
-        Promise.resolve(window.wrMotion?.entered).then(() => setTimeout(() => { consentBox.hidden = false; }, 400));
+        Promise.resolve(window.wrMotion?.entered)
+          .then(() => new Promise((r) => setTimeout(r, 400)))
+          .then(() => window.wrMotion?.heroMoved)
+          .then(() => { consentBox.hidden = false; });
       }, 500);
     }
     consentBox.addEventListener('click', (e) => {

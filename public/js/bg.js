@@ -176,7 +176,11 @@
 
   resize();
   // Плавна прокрутка для фону: фаза й паралакс «доганяють» реальну прокрутку, без ривків
-  let scrollShown = scrollY;
+  // Прокрутку беремо з події scroll, а не читаємо scrollY у кожному кадрі: читання scrollY змушує браузер одразу
+  // перерахувати розкладку, якщо в цьому кадрі щось змінилося в розмітці (поділ заголовків на рядки, повернення літер)
+  let scrollNow = scrollY;
+  addEventListener('scroll', () => { scrollNow = scrollY; }, { passive: true });
+  let scrollShown = scrollNow;
   draw(12, reduceMotion ? 0 : scrollShown);
   host.classList.add('is-ready');
 
@@ -200,7 +204,7 @@
     const a = window.wrAudioLevel;
     level.bass += ((a ? a.bass : 0) - level.bass) * 0.12;
     level.mid += ((a ? a.mid : 0) - level.mid) * 0.12;
-    scrollShown += (scrollY - scrollShown) * 0.18;
+    scrollShown += (scrollNow - scrollShown) * 0.18;
     draw(time, scrollShown);
   }
   const start = () => { if (!raf) { prev = performance.now(); raf = requestAnimationFrame(frame); } };
