@@ -160,7 +160,7 @@ function headings() {
 }
 // Вміст без власної анімації (текст юридичних сторінок, кнопки, фото, футер) — м'яке проявлення.
 // Прозорість лишається вбудованою (opacity: 1): інакше знову спрацює приховане правило з site.css
-const PLAIN = 'main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn, .section-steps .steps, .steps-cta, .marquee, .book-help, .book-pick > .book-step-head, .faq-nav, .faq-group-title, .faq-help, .faq-home-ctas, .site-footer';
+const PLAIN = 'main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn, .section-steps .steps, .steps-cta, .marquee, .book-help, .book-pick > .book-step-head, .book-picker, .faq-nav, .faq-group-title, .faq-help, .faq-home-ctas, .site-footer';
 function plainFade() {
   // Блок Послуг на головній (сцена з закріпленням) проявляє сама сцена — тут його не чіпаємо
   $$(PLAIN).filter((el) => !(motion.stage && el.closest('.svc-section'))).forEach((el) => {
@@ -170,18 +170,19 @@ function plainFade() {
 
 /* ---------- Плавне зникнення першого екрана ----------
    Прив'язане до прогресу прокрутки (scrub, синхронно з Lenis), без перемикання класів:
-   заголовок піднімається на ~70 px, згасає і ледь розмивається; підзаголовок із кнопками — з невеликою затримкою.
+   заголовок піднімається на ~70 px і згасає; підзаголовок із кнопками — з невеликою затримкою.
    autoAlpha вмикає visibility: hidden лише при непрозорості рівно 0 і знімає, щойно вона починає зростати,
-   тож нагорі кнопки завжди клікабельні. prefers-reduced-motion — лише згасання, без руху й розмиття.
-   Анімуються тільки transform, opacity і filter. */
+   тож нагорі кнопки завжди клікабельні. prefers-reduced-motion — лише згасання, без руху.
+   Анімуються тільки transform і opacity: розмиття (filter) великого заголовка з тінню тексту браузер перемальовував
+   на кожному кадрі прокрутки — текст рухався ривками, «слайдшоу». Шари заголовка й кнопок — will-change у site.css. */
 function heroFadeTweens(tl, at = 0) {
   const hero = document.querySelector('.hero');
   if (!hero) return;
   const out = (el, offset, span, dy) => {
     if (!el) return;
     tl.fromTo(el,
-      { autoAlpha: 1, y: 0, filter: 'blur(0px)' },
-      { autoAlpha: 0, y: reduceMotion ? 0 : dy, filter: reduceMotion ? 'blur(0px)' : 'blur(7px)', duration: span, ease: 'none' },
+      { autoAlpha: 1, y: 0 },
+      { autoAlpha: 0, y: reduceMotion ? 0 : dy, duration: span, ease: 'none' },
       at + offset);
   };
   out(hero.querySelector('.hero-title'), 0, 0.62, -70);
@@ -338,7 +339,7 @@ function servicesPause() {
 
 /* ---------- 2. Картки, треки, номери ---------- */
 function blocks() {
-  const groups = motion.stage ? '.svc-full-grid, .phil-grid, .bento, .book-info, .book-svc-grid, .book-how, .gallery, .chips' : '.svc-grid, .svc-full-grid, .phil-grid, .bento, .book-info, .book-svc-grid, .book-how, .gallery, .chips';
+  const groups = motion.stage ? '.svc-full-grid, .phil-grid, .bento, .book-info, .book-how, .gallery, .chips' : '.svc-grid, .svc-full-grid, .phil-grid, .bento, .book-info, .book-how, .gallery, .chips';
   cascade($$(`:is(${groups}) > *`));
   cascade($$('.faq-list > .faq-item'), { y: 24, stagger: 0.06 });
   $$('.cta-band, .tl-text, .empty-state').forEach((el) => cascade([el], { y: 30 }));
@@ -886,7 +887,15 @@ function splitCharsKerned(line) {
 
 /* Поява першого екрана (його «назва сторінки»): викликає диригент після інтро чи шторки.
    Текст і 3D-сцена проявляються разом, один раз; якщо сцена ще не готова — проявиться, щойно буде.
-   Літери WAVE RECORDS виїжджають знизу, далі решта. */
+   Літери WAVE RECORDS виїжджають знизу, далі решта.
+   Рух — Web Animations (не GSAP): браузер веде такі анімації transform/opacity окремо від основного потоку, тож вони
+   плавні, навіть коли основний потік зайнятий 3D-сценою, що якраз стартує. Раніше GSAP міняв transform кожної літери
+   з основного потоку, і на кожному кадрі великі літери з тінню перемальовувались — поява йшла ривками. */
+const RISE_EASE = 'cubic-bezier(.19, 1, .22, 1)'; // ≈ expo.out
+function rise(els, from, { duration, delay = 0, stagger = 0 }) {
+  return [...els].filter(Boolean).map((el, i) => el.animate?.([from, { opacity: 1, transform: 'none' }],
+    { duration: duration * 1000, delay: (delay + i * stagger) * 1000, easing: RISE_EASE, fill: 'backwards' })).filter(Boolean);
+}
 function heroIntro(still = false) {
   const intro = document.querySelector('[data-hero-intro]');
   const host = document.querySelector('[data-hero-scene]');
@@ -899,17 +908,18 @@ function heroIntro(still = false) {
   {
     show();
     if (gentle(intro)) {
-      gsap.from([line1, ...rest].filter(Boolean), { y: GENTLE_Y, opacity: 0, duration: 0.8, ease: EASE, stagger: 0.06, clearProps: 'transform' });
+      rise([line1, ...rest], { opacity: 0, transform: `translateY(${GENTLE_Y}px)` }, { duration: 0.8, stagger: 0.06 });
       return;
     }
     // На телефоні рядок не ділимо на літери: при поділі змінюється кернінг і ширина рядка (~2 px), а після анімації
     // (split.revert) центрований рядок «стрибав» на кілька пікселів. Там рядок виїжджає цілим
     const phone = matchMedia('(max-width: 860px)').matches;
     const split = SplitText && line1 && !phone ? splitCharsKerned(line1) : null;
-    const tl = gsap.timeline({ defaults: { ease: EASE }, onComplete: () => split?.revert() });
-    if (split) tl.from(split.chars, { yPercent: 110, duration: 1.2, stagger: 0.035 });
-    else if (line1) tl.from(line1, { y: 40, opacity: 0, duration: 1.1 });
-    tl.from(rest, { y: 28, opacity: 0, duration: 1, stagger: 0.1 }, split ? 0.35 : 0.2);
+    const letters = split
+      ? rise(split.chars, { opacity: 1, transform: 'translateY(110%)' }, { duration: 1.2, stagger: 0.035 })
+      : rise([line1], { opacity: 0, transform: 'translateY(40px)' }, { duration: 1.1 });
+    rise(rest, { opacity: 0, transform: 'translateY(28px)' }, { duration: 1, delay: split ? 0.35 : 0.2, stagger: 0.1 });
+    if (split) Promise.all(letters.map((a) => a.finished)).then(() => split.revert(), () => split.revert());
   }
 }
 

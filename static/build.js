@@ -158,7 +158,7 @@ async function main() {
   }
   const bookingCfg = readJson('booking.json');
   const { bookingServices } = await import('../src/cal-booking.js');
-  const booking = bookingServices(bookingCfg, services.sound || []);
+  const booking = bookingServices(bookingCfg, services);
   if (bookingCfg && booking.issues.length) fail(`Помилка у файлі content/booking.json:\n${booking.issues.map((m) => `     – ${m}`).join('\n')}`);
   if (problems.length) return;
   // Куди ведуть кнопки «Записатися»: /book?service=id — лише для послуг, на які є онлайн-запис
@@ -228,7 +228,7 @@ async function main() {
     'services/index.html': views.servicesPage({ sound, media, business }),
     'portfolio/index.html': views.portfolioPage({ vocal, music, b2b }),
     'about/index.html': views.aboutPage({ photos }),
-    'book/index.html': views.calBookPage({ services: booking.services, texts: bookingCfg.texts || {} }),
+    'book/index.html': views.calBookPage({ services: booking.services, texts: bookingCfg.texts || {}, groups: { sound: texts.services?.sound_title, media: texts.services?.media_title, business: texts.services?.business_title } }),
     'contacts/index.html': views.contactsPage(),
     'faq/index.html': views.faqPage(faq),
     'privacy-policy/index.html': views.legalPage('legal.privacy', '/privacy-policy'),
@@ -275,7 +275,7 @@ async function main() {
   (await import('../src/db.js')).db.close();
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(`\n✅ Сайт зібрано: ${Object.keys(pages).length} сторінок, треків: ${vocal.length + music.length + b2b.length}, фото: ${photos.length}.`);
-  console.log(`   Запис: послуг ${booking.services.length}, з календарем Cal.com — ${calReady}.`);
+  console.log(`   Запис: послуг ${booking.services.length}, з календарем Cal.com — ${calReady}, пакетів — ${booking.services.filter((s) => s.package).length}.`);
 }
 
 await main();

@@ -480,24 +480,31 @@ export function bookPage({ services, preselect }) {
 }
 
 /* ---------- /book для GitHub Pages: запис через Cal.com ----------
-   Крок 1 — скляні картки послуг (назва, тривалість і ціна з services.json), крок 2 — календар Cal.com саме для цього
-   типу запису (inline embed). Поки тип запису не заповнений у booking.json — кнопка «Записатися в Telegram».
-   Логіка — public/js/book-cal.js: скрипт Cal.com вантажиться лише тут і лише після вибору послуги з календарем. */
+   Крок 1 — випадний список усіх послуг (групи, як на сторінці Послуг; можна обрати кілька, але лише один пакет).
+   Крок 2 — обрані послуги з описами; для послуг із записом у студії — календар Cal.com (inline embed, свій для кожної),
+   для решти — «робиться дистанційно, деталі в Telegram». Назва, тривалість, ціна й опис — з services.json.
+   Логіка — public/js/book-cal.js: скрипт Cal.com вантажиться лише тут і лише коли обрано послугу з календарем. */
 
-export function calBookPage({ services, texts = {} }) {
+export function calBookPage({ services, texts = {}, groups = {} }) {
   const info = block('book.info');
   const c = block('contacts');
   const t = texts;
   const tg = telegramUrl();
   const num = (i) => String(i + 1).padStart(2, '0');
   const data = {
-    services: services.map((s) => ({ id: s.id, name: s.name, price: s.price, duration: s.duration, calLink: s.calLink })),
-    texts: { loading: t.loading, error: t.error },
+    services: services.map((s) => ({ id: s.id, name: s.name, price: s.price, duration: s.duration, calLink: s.calLink, package: s.package })),
+    texts: {
+      loading: t.loading, placeholder: t.picker_placeholder, count: t.picker_count, step_time: t.step_time, step_remote: t.step_remote,
+      calendar_for: t.calendar_for, remote_one: t.remote_one, remote_many: t.remote_many,
+    },
   };
   const ok = t.success || {};
   const address = [c.address, c.city].filter(Boolean).join(', ');
   data.success = { event_title: ok.event_title, hour: ok.hour, min: ok.min, location: [c.studio, address].filter(Boolean).join(', ') };
   const how = Array.isArray(t.how) ? t.how.filter((it) => it && it.title) : [];
+  const groupTitle = { sound: groups.sound || 'Sound', media: groups.media || 'Media | PR', business: groups.business || 'BUSINESS' };
+  const grouped = Object.keys(groupTitle).map((g) => ({ id: g, title: groupTitle[g], list: services.filter((s) => s.group === g) })).filter((g) => g.list.length);
+  const meta = (s) => [s.duration, s.price].filter(Boolean).join(' · ');
 
   const body = html`
   <section class="page-head container">
@@ -510,62 +517,106 @@ export function calBookPage({ services, texts = {} }) {
 
     <section class="book-step book-pick" id="book-service" aria-labelledby="book-h-service">
       <header class="book-step-head"><span class="book-step-num" aria-hidden="true">01</span><h2 class="book-step-title" id="book-h-service">${t.step_service}</h2></header>
-      <ul class="book-svc-grid" role="list">
-        ${services.map((s) => html`
-        <li><button type="button" class="book-svc glass glass-card" data-book-service="${s.id}" aria-pressed="false" aria-controls="book-time">
-          <span class="book-svc-name">${s.name}</span>
-          <span class="book-svc-meta">
-            ${s.duration ? html`<span class="book-svc-dur">${icon.clock}${s.duration}</span>` : ''}
-            <span class="book-svc-price">${s.price}</span>
-          </span>
-          <span class="book-svc-mark" aria-hidden="true"></span>
-        </button></li>`)}
-      </ul>
+      <!-- Випадний список послуг: кнопка відкриває панель із чекбоксами (можна кілька, пакет — лише один) -->
+      <div class="book-picker" data-picker>
+        <button type="button" class="book-picker-btn glass" aria-expanded="false" aria-controls="book-picker-panel" data-picker-btn>
+          <span class="book-picker-value" data-picker-value>${t.picker_placeholder}</span>
+          <span class="book-picker-count" data-picker-count hidden></span>
+          <span class="book-picker-chev" aria-hidden="true">${icon.chevR}</span>
+        </button>
+        <div class="book-picker-panel glass glass-panel" id="book-picker-panel" data-picker-panel hidden>
+          <div class="book-picker-scroll" data-lenis-prevent>
+            ${grouped.map((g) => html`
+            <fieldset class="book-picker-group">
+              <legend class="book-picker-legend h-latin">${g.title}</legend>
+              ${g.list.map((s) => html`
+              <label class="book-opt">
+                <input type="checkbox" class="book-opt-input" value="${s.id}" data-book-service="${s.id}" ${s.package ? raw('data-package') : ''}>
+                <span class="book-opt-box" aria-hidden="true"></span>
+                <span class="book-opt-body">
+                  <span class="book-opt-top"><span class="book-opt-name">${s.name}</span><span class="book-opt-price">${s.price}</span></span>
+                  <span class="book-opt-tags">
+                    <span class="book-opt-tag${s.calLink ? ' is-studio' : ''}">${s.calLink ? t.studio : t.remote}</span>
+                    ${s.duration ? html`<span class="book-opt-dur">${icon.clock}${s.duration}</span>` : ''}
+                  </span>
+                  ${s.description ? html`<span class="book-opt-desc">${s.description}</span>` : ''}
+                </span>
+              </label>`)}
+            </fieldset>`)}
+          </div>
+          <div class="book-picker-foot">
+            <button type="button" class="btn btn-neon btn-sm" data-picker-done>${t.picker_done}</button>
+          </div>
+        </div>
+        <p class="book-picker-alert glass" role="status" aria-live="polite" data-picker-alert hidden>${t.package_limit}</p>
+      </div>
     </section>
 
-    <!-- Крок 2 з'являється після вибору послуги -->
+    <!-- Крок 2 з'являється, коли обрано хоча б одну послугу -->
     <section class="book-step book-time" id="book-time" aria-labelledby="book-h-time" hidden data-book-time>
       <header class="book-step-head"><span class="book-step-num" aria-hidden="true">02</span><h2 class="book-step-title" id="book-h-time" tabindex="-1">${t.step_time}</h2></header>
-      <div class="book-chosen glass" aria-live="polite">
-        <div class="book-chosen-text">
+      <div class="book-chosen glass">
+        <div class="book-chosen-head">
           <p class="book-chosen-label">${t.selected}</p>
-          <p class="book-chosen-name" data-book-name></p>
-          <p class="book-chosen-meta" data-book-meta></p>
+          <button type="button" class="btn btn-glass btn-sm book-change" data-book-change>${icon.chevL}<span>${t.change}</span></button>
         </div>
-        <button type="button" class="btn btn-glass btn-sm book-change" data-book-change>${icon.chevL}<span>${t.change}</span></button>
+        <ul class="book-chosen-list" role="list">
+          ${services.map((s) => html`
+          <li class="book-chosen-item" data-chosen="${s.id}" hidden>
+            <div class="book-chosen-text">
+              <p class="book-chosen-name">${s.name}</p>
+              <p class="book-chosen-meta">${meta(s)}</p>
+              ${s.description ? html`<p class="book-chosen-desc">${s.description}</p>` : ''}
+            </div>
+            <button type="button" class="book-chosen-x" data-unpick="${s.id}" aria-label="${t.remove}: ${s.name}">${icon.close}</button>
+          </li>`)}
+        </ul>
       </div>
-      <div class="book-cal glass glass-panel" data-book-cal data-lenis-prevent>
-        <div class="book-cal-status" data-book-loading hidden>
-          <span class="book-cal-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
-          <span>${t.loading}</span>
+
+      <!-- Календарі Cal.com — по одному на кожну обрану послугу із записом у студії (додає book-cal.js) -->
+      <div class="book-cals" data-book-cals></div>
+      <template data-cal-template>
+        <div class="book-cal-sec">
+          <h3 class="book-cal-title" data-cal-title></h3>
+          <div class="book-cal glass glass-panel" data-book-cal data-lenis-prevent>
+            <div class="book-cal-status" data-book-loading hidden>
+              <span class="book-cal-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+              <span>${t.loading}</span>
+            </div>
+            <p class="book-cal-error" data-book-error role="alert" hidden>${t.error} <a class="text-link" href="#" target="_blank" rel="noopener" data-book-error-link>${t.error_link}${icon.arrowUp}</a></p>
+          </div>
         </div>
-        <p class="book-cal-error" data-book-error role="alert" hidden>${t.error} <a class="text-link" href="#" target="_blank" rel="noopener" data-book-error-link>${t.error_link}${icon.arrowUp}</a></p>
-        <div class="book-stub" data-book-stub hidden>
-          <p class="book-stub-text">${t.stub_text}</p>
-          <a class="btn btn-neon" href="${tg}" rel="noopener" data-cta="book_stub_telegram">${t.stub_button}${icon.arrowUp}</a>
-        </div>
+      </template>
+
+      <!-- Дистанційні послуги: без календаря, деталі в Telegram -->
+      <div class="book-remote glass glass-panel" data-book-remote hidden>
+        <p class="book-remote-text" data-remote-text></p>
+        <ul class="book-remote-list" role="list" data-remote-list></ul>
+        <a class="btn btn-neon" href="${tg}" rel="noopener" data-cta="book_remote_telegram">${t.remote_button}${icon.arrowUp}</a>
       </div>
       ${info.price_note ? html`<p class="book-note" data-book-note>${info.price_note}</p>` : ''}
 
-      <!-- Екран успіху: замість підтвердження Cal.com (дані запису заповнює book-cal.js) -->
-      <div class="book-done glass glass-panel" data-book-done hidden tabindex="-1" aria-labelledby="book-done-title">
-        <span class="book-done-mark" aria-hidden="true"></span>
-        <h2 class="book-done-title" id="book-done-title">${ok.title}</h2>
-        ${ok.text ? html`<p class="book-done-lead">${ok.text}</p>` : ''}
-        <dl class="book-done-list">
-          <div><dt>${ok.service}</dt><dd data-done-service></dd></div>
-          <div data-done-when hidden><dt>${ok.date}</dt><dd data-done-date></dd></div>
-          <div data-done-when hidden><dt>${ok.time}</dt><dd data-done-time></dd></div>
-          <div data-done-dur hidden><dt>${ok.duration}</dt><dd data-done-duration></dd></div>
-          <div class="book-done-addr"><dt>${ok.address}</dt><dd><span>${address}</span><a class="text-link" href="${mapsUrl(c)}" rel="noopener" target="_blank" data-cta="book_done_map">${ok.map_link}${icon.arrowUp}</a></dd></div>
-        </dl>
-        <div class="book-done-actions" data-done-when hidden>
-          <a class="btn btn-glass" href="#" rel="noopener" target="_blank" data-done-google data-cta="book_done_google">${ok.google}</a>
-          <button type="button" class="btn btn-glass" data-done-ics>${ok.ics}</button>
+      <!-- Екран успіху: замість підтвердження Cal.com, окремий для кожного запису (дані заповнює book-cal.js) -->
+      <template data-done-template>
+        <div class="book-done glass glass-panel" data-book-done tabindex="-1" role="group">
+          <span class="book-done-mark" aria-hidden="true"></span>
+          <h3 class="book-done-title">${ok.title}</h3>
+          ${ok.text ? html`<p class="book-done-lead">${ok.text}</p>` : ''}
+          <dl class="book-done-list">
+            <div><dt>${ok.service}</dt><dd data-done-service></dd></div>
+            <div data-done-when hidden><dt>${ok.date}</dt><dd data-done-date></dd></div>
+            <div data-done-when hidden><dt>${ok.time}</dt><dd data-done-time></dd></div>
+            <div data-done-dur hidden><dt>${ok.duration}</dt><dd data-done-duration></dd></div>
+            <div class="book-done-addr"><dt>${ok.address}</dt><dd><span>${address}</span><a class="text-link" href="${mapsUrl(c)}" rel="noopener" target="_blank" data-cta="book_done_map">${ok.map_link}${icon.arrowUp}</a></dd></div>
+          </dl>
+          <div class="book-done-actions" data-done-when hidden>
+            <a class="btn btn-glass" href="#" rel="noopener" target="_blank" data-done-google data-cta="book_done_google">${ok.google}</a>
+            <button type="button" class="btn btn-glass" data-done-ics>${ok.ics}</button>
+          </div>
+          ${ok.manage ? html`<p class="book-done-manage">${ok.manage}</p>` : ''}
+          <a class="btn btn-neon" href="${tg}" rel="noopener" data-cta="book_done_telegram">${ok.telegram}${icon.arrowUp}</a>
         </div>
-        ${ok.manage ? html`<p class="book-done-manage">${ok.manage}</p>` : ''}
-        <a class="btn btn-neon" href="${tg}" rel="noopener" data-cta="book_done_telegram">${ok.telegram}${icon.arrowUp}</a>
-      </div>
+      </template>
     </section>
   </div>
 

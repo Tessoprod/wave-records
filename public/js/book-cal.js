@@ -1,19 +1,22 @@
 /* Wave Records — сторінка запису через Cal.com (/book, статична версія).
-   Крок 1: вибір послуги (картки). Крок 2: календар Cal.com для цього типу запису (inline embed) або, поки тип запису
-   не заповнений у content/booking.json, кнопка «Записатися в Telegram».
-   - embed.js з app.cal.com вантажиться лише після вибору послуги з календарем (на інших сторінках його немає);
-   - кожна послуга — окремий простір імен Cal (свій календар), тож повернення до вже відкритої послуги миттєве;
-   - ?service=id в адресі одразу обирає послугу; вибір записується в адресу (history.replaceState);
-   - аналітика (dataLayer через window.wrTrack із site.js): booking_service_select — при виборі послуги,
-     booking_success — після успішного запису (Cal: bookingSuccessful / bookingSuccessfulV2), рівно один раз;
-   - після запису календар зникає, замість англійського підтвердження Cal.com — власний екран успіху [data-book-done]
-     (дата й час — за київським часом, «Додати в Google Calendar», файл .ics створюється в браузері). */
+   Крок 1: випадний список усіх послуг (чекбокси в групах Sound / Media | PR / BUSINESS). Можна обрати кілька послуг,
+   але лише один пакет (data-package) — спроба обрати другий показує сповіщення.
+   Крок 2: обрані послуги з описами; для кожної послуги із записом у студії (calLink) — свій календар Cal.com
+   (inline embed, свій namespace), для решти — блок «робиться дистанційно, деталі в Telegram».
+   - embed.js з app.cal.com вантажиться лише коли обрано послугу з календарем (на інших сторінках його немає);
+   - зняли послугу — її календар ховається (не видаляється), повторний вибір показує його миттєво;
+   - ?service=id[,id…] в адресі одразу обирає послуги; вибір записується в адресу (history.replaceState);
+   - аналітика (dataLayer через window.wrTrack із site.js): booking_service_select — при додаванні послуги,
+     booking_success — після успішного запису (Cal: bookingSuccessful / bookingSuccessfulV2), рівно один раз на календар;
+   - після запису календар цієї послуги зникає, на його місці — власний екран успіху (з шаблону [data-done-template]):
+     дата й час — за київським часом, «Додати в Google Calendar», файл .ics створюється в браузері. */
 (() => {
   'use strict';
   const root = document.querySelector('[data-book]');
   const dataEl = document.getElementById('book-cal-data');
   if (!root || !dataEl) return;
   const data = JSON.parse(dataEl.textContent);
+  const T = data.texts || {};
   const $ = (sel, el = document) => el.querySelector(sel);
   const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -21,23 +24,109 @@
   const CAL_SCRIPT = `${CAL_ORIGIN}/embed/embed.js`;
 
   const step2 = $('[data-book-time]');
-  const cal = $('[data-book-cal]');
-  const els = {
-    name: $('[data-book-name]'), meta: $('[data-book-meta]'), change: $('[data-book-change]'),
-    loading: $('[data-book-loading]'), error: $('[data-book-error]'), errorLink: $('[data-book-error-link]'), stub: $('[data-book-stub]'),
-    title: $('#book-h-time'),
-  };
-  const cards = $$('[data-book-service]');
+  const title2 = $('#book-h-time');
+  const calsBox = $('[data-book-cals]');
+  const calTpl = $('[data-cal-template]');
+  const doneTpl = $('[data-done-template]');
+  const remote = $('[data-book-remote]');
+  const order = data.services.map((s) => s.id);
   const byId = new Map(data.services.map((s) => [s.id, s]));
+  const picked = new Set(); // id обраних послуг
 
   const track = (name, params) => {
     if (window.wrTrack) window.wrTrack(name, params);
     else (window.dataLayer = window.dataLayer || []).push({ event: name, ...params });
   };
 
+  // ?debug=booking — у консоль: вибір послуг, усі події від Cal.com і зміни висоти iframe
+  const DEBUG = new URLSearchParams(location.search).get('debug') === 'booking';
+  const dbg = (...a) => { if (DEBUG) console.log('[booking]', ...a); };
+
+  const fade = (el, keyframes, ms, fill = 'none') => el.animate?.(keyframes, { duration: reduce ? Math.min(ms, 250) : ms, easing: 'cubic-bezier(.16, 1, .3, 1)', fill });
+  const appear = (el, dy = 20, ms = 600) => fade(el, reduce ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: `translateY(${dy}px)` }, { opacity: 1, transform: 'none' }], ms);
+
+  // Висота сторінки змінилась (крок 2, календар підріс) — перерахувати анімації на скролі
+  let refreshQueued = 0;
+  function refreshLayout() {
+    cancelAnimationFrame(refreshQueued);
+    refreshQueued = requestAnimationFrame(() => window.wrMotion?.ScrollTrigger?.refresh());
+  }
+  if ('ResizeObserver' in window) new ResizeObserver(refreshLayout).observe(step2);
+
+  function scrollToEl(el, offset = 0) {
+    const lenis = window.wrMotion?.lenis;
+    if (lenis && !reduce) lenis.scrollTo(el, { duration: 1, offset });
+    else el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  }
+
+  /* ---------- Випадний список послуг ---------- */
+  const picker = $('[data-picker]');
+  const pickBtn = $('[data-picker-btn]');
+  const panel = $('[data-picker-panel]');
+  const pickValue = $('[data-picker-value]');
+  const pickCount = $('[data-picker-count]');
+  const alertEl = $('[data-picker-alert]');
+  const boxes = $$('[data-book-service]', panel);
+
+  function openPicker(focusFirst = false) {
+    if (!panel.hidden) return;
+    // Панель вміщається у вільне місце під кнопкою (разом із «Готово»), але не нижча за 320 px
+    const room = innerHeight - pickBtn.getBoundingClientRect().bottom - 28;
+    panel.style.maxHeight = `${Math.round(Math.max(320, Math.min(640, room)))}px`;
+    panel.hidden = false;
+    pickBtn.setAttribute('aria-expanded', 'true');
+    picker.classList.add('is-open');
+    panel.getAnimations?.().forEach((a) => a.cancel());
+    fade(panel, reduce ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(-10px) scale(.98)' }, { opacity: 1, transform: 'none' }], 380);
+    if (focusFirst) (boxes.find((b) => b.checked) || boxes[0])?.focus({ preventScroll: true });
+  }
+  function closePicker(focusBtn = false) {
+    if (panel.hidden || pickBtn.getAttribute('aria-expanded') === 'false') return;
+    pickBtn.setAttribute('aria-expanded', 'false');
+    picker.classList.remove('is-open');
+    const a = fade(panel, [{ opacity: 1 }, { opacity: 0, transform: reduce ? 'none' : 'translateY(-6px)' }], 200);
+    const hide = () => { if (pickBtn.getAttribute('aria-expanded') === 'false') panel.hidden = true; };
+    if (a) a.onfinish = hide; else hide();
+    if (focusBtn) pickBtn.focus({ preventScroll: true });
+  }
+  pickBtn.addEventListener('click', () => (pickBtn.getAttribute('aria-expanded') === 'true' ? closePicker() : openPicker()));
+  $('[data-picker-done]', panel).addEventListener('click', () => {
+    closePicker(true);
+    if (picked.size) setTimeout(() => scrollToEl(step2, -16), reduce ? 0 : 120);
+  });
+  document.addEventListener('pointerdown', (e) => { if (!panel.hidden && !picker.contains(e.target)) closePicker(); });
+  picker.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) { e.preventDefault(); closePicker(true); } });
+  picker.addEventListener('focusout', (e) => { if (!panel.hidden && e.relatedTarget && !picker.contains(e.relatedTarget)) closePicker(); });
+
+  // Сповіщення «Можна обрати лише один пакет…»: з'являється біля списку й ховається за ~4 с
+  let alertTimer = 0;
+  function showAlert() {
+    clearTimeout(alertTimer);
+    alertEl.getAnimations?.().forEach((a) => a.cancel());
+    alertEl.hidden = false;
+    fade(alertEl, reduce ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], 350);
+    alertTimer = setTimeout(() => {
+      const a = fade(alertEl, [{ opacity: 1 }, { opacity: 0 }], 300);
+      if (a) a.onfinish = () => { alertEl.hidden = true; }; else alertEl.hidden = true;
+    }, 4000);
+  }
+
+  function pickerSummary() {
+    const list = order.filter((id) => picked.has(id)).map((id) => byId.get(id).name);
+    pickValue.textContent = list.length ? list.join(', ') : T.placeholder || '';
+    picker.classList.toggle('has-value', list.length > 0);
+    pickCount.hidden = list.length < 2;
+    pickCount.textContent = (T.count || '{n}').replace('{n}', list.length);
+  }
+
+  boxes.forEach((box) => box.addEventListener('change', () => {
+    if (!box.checked) { remove(box.value); return; }
+    if (!add(box.value, 'click')) box.checked = false;
+  }));
+
   /* ---------- Cal.com ---------- */
   // Офіційний завантажувач Cal.com (embed snippet): створює window.Cal і чергу викликів, сам embed.js додає в <head>
-  // при першому виклику. Викликається лише тут — після вибору послуги з календарем.
+  // при першому виклику. Викликається лише тут — коли обрано послугу з календарем.
   function calApi() {
     if (window.Cal) return window.Cal;
     /* eslint-disable */
@@ -57,23 +146,13 @@
     return { theme: 'dark', hideEventTypeDetails: true, layout: 'month_view', cssVarsPerTheme: { dark: vars } };
   }
 
-  // ?debug=booking — у консоль: усі події від Cal.com і зміни висоти iframe
-  const DEBUG = new URLSearchParams(location.search).get('debug') === 'booking';
-  const dbg = (...a) => { if (DEBUG) console.log('[booking]', ...a); };
-
-  const embeds = new Map(); // id послуги → { box, ready, failed, booked }
+  const embeds = new Map(); // id послуги → { service, sec, cal, box, ready, failed, booked, booking, done, timer }
   const seenBookings = new Set();
-  let current = null;
-  let loadTimer = 0;
   let nsCount = 0;
 
   /* ---------- Екран успіху (замість підтвердження Cal.com) ---------- */
-  const done = $('[data-book-done]');
-  const flow = [$('.book-step-head', step2), $('.book-chosen', step2), cal, $('[data-book-note]')].filter(Boolean);
   const S = data.success || {};
   const KYIV = 'Europe/Kyiv';
-  let booking = null; // { service, start, end, minutes, uid }
-  let doneTimer = 0;
 
   // Дані з події Cal.com: нова bookingSuccessfulV2 — { uid, title, startTime, endTime, … },
   // стара bookingSuccessful — { booking: { uid, startTime, endTime }, eventType: { length }, date, duration }
@@ -121,59 +200,47 @@
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  $('[data-done-ics]', done)?.addEventListener('click', () => { if (booking && booking.start && booking.end) downloadIcs(booking); });
 
-  function fillDone(b) {
+  function fillDone(el, b) {
     const when = !!(b.start && b.end);
-    $('[data-done-service]', done).textContent = b.service.name;
-    $$('[data-done-when]', done).forEach((el) => { el.hidden = !when; });
+    $('[data-done-service]', el).textContent = b.service.name;
+    $$('[data-done-when]', el).forEach((x) => { x.hidden = !when; });
     const dur = b.minutes ? fmtMinutes(b.minutes) : b.service.duration || '';
-    $('[data-done-dur]', done).hidden = !dur;
-    $('[data-done-duration]', done).textContent = dur;
+    $('[data-done-dur]', el).hidden = !dur;
+    $('[data-done-duration]', el).textContent = dur;
     if (when) {
       const day = fmtDate.format(b.start);
-      $('[data-done-date]', done).textContent = day.charAt(0).toUpperCase() + day.slice(1);
-      $('[data-done-time]', done).textContent = `${fmtTime.format(b.start)}–${fmtTime.format(b.end)}`;
-      $('[data-done-google]', done).href = googleLink(b);
+      $('[data-done-date]', el).textContent = day.charAt(0).toUpperCase() + day.slice(1);
+      $('[data-done-time]', el).textContent = `${fmtTime.format(b.start)}–${fmtTime.format(b.end)}`;
+      $('[data-done-google]', el).href = googleLink(b);
     }
   }
 
-  const fade = (el, keyframes, ms, fill = 'none') => el.animate?.(keyframes, { duration: reduce ? Math.min(ms, 250) : ms, easing: 'cubic-bezier(.16, 1, .3, 1)', fill });
-  const resetFlow = () => flow.forEach((el) => { el.getAnimations?.().forEach((a) => a.cancel()); });
-
-  function showDone() {
-    fillDone(booking);
-    resetFlow();
-    flow.forEach((el) => { el.hidden = true; });
-    done.hidden = false;
-    fade(done, reduce ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(24px) scale(.98)' }, { opacity: 1, transform: 'none' }], 800);
+  function showDone(entry) {
+    const el = doneTpl.content.firstElementChild.cloneNode(true);
+    $('[data-done-ics]', el).addEventListener('click', () => { const b = entry.booking; if (b.start && b.end) downloadIcs(b); });
+    fillDone(el, entry.booking);
+    entry.done = el;
+    entry.cal.replaceWith(el);
+    $('[data-cal-title]', entry.sec).hidden = true;
+    fade(el, reduce ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(24px) scale(.98)' }, { opacity: 1, transform: 'none' }], 800);
     refreshLayout();
-    scrollToEl(step2);
-    done.focus({ preventScroll: true });
-  }
-
-  // Нова послуга після запису (чи під час зникання календаря) — знову крок 2 з календарем
-  function hideDone() {
-    clearTimeout(doneTimer);
-    booking = null;
-    resetFlow();
-    done.hidden = true;
-    flow.forEach((el) => { el.hidden = false; });
-    const live = new Set([...embeds.values()].map((x) => x.box));
-    $$('.book-cal-embed', cal).forEach((box) => { if (!live.has(box)) box.remove(); });
+    scrollToEl(entry.sec, -24);
+    el.focus({ preventScroll: true });
   }
 
   function onBooked(service, entry, e) {
     const d = (e && e.detail && e.detail.data) || {};
-    dbg('успішний запис', e && e.detail && e.detail.type, d);
+    dbg('успішний запис', service.id, e && e.detail && e.detail.type, d);
     const info = bookingData(d);
     // Cal надсилає на один запис дві події (стару bookingSuccessful і нову V2) — друга лише доповнює дані
     if (entry.booked) {
-      if (booking && booking.service === service) {
-        if (!booking.start && info.start) Object.assign(booking, { start: info.start, end: info.end });
-        if (!booking.minutes && info.minutes) booking.minutes = info.minutes;
-        if (!booking.uid && info.uid) booking.uid = info.uid;
-        if (!done.hidden) fillDone(booking);
+      const b = entry.booking;
+      if (b) {
+        if (!b.start && info.start) Object.assign(b, { start: info.start, end: info.end });
+        if (!b.minutes && info.minutes) b.minutes = info.minutes;
+        if (!b.uid && info.uid) b.uid = info.uid;
+        if (entry.done) fillDone(entry.done, b);
       }
       return;
     }
@@ -181,22 +248,20 @@
     if (info.uid && seenBookings.has(info.uid)) return;
     if (info.uid) seenBookings.add(info.uid);
     track('booking_success', { service: service.name, service_id: service.id });
-    booking = { service, ...info };
-    // Календар (з англійським підтвердженням Cal.com) плавно зникає, далі — власний екран успіху.
-    // Використаний календар більше не показуємо: повторний вибір послуги відкриє новий.
-    embeds.delete(service.id);
-    clearTimeout(loadTimer);
-    flow.forEach((el) => fade(el, [{ opacity: 1 }, { opacity: 0 }], 280, 'forwards'));
-    doneTimer = setTimeout(() => { entry.box.remove(); if (current === service) showDone(); }, reduce ? 0 : 300);
+    entry.booking = { service, ...info };
+    // Календар (з англійським підтвердженням Cal.com) плавно зникає, на його місці — власний екран успіху
+    clearTimeout(entry.timer);
+    fade(entry.cal, [{ opacity: 1 }, { opacity: 0 }], 280, 'forwards');
+    setTimeout(() => showDone(entry), reduce ? 0 : 300);
   }
 
   function showStatus(entry) {
-    clearTimeout(loadTimer);
-    els.loading.hidden = !(entry && !entry.ready && !entry.failed);
-    els.error.hidden = !(entry && entry.failed);
-    if (entry && entry.failed) els.errorLink.href = `https://cal.com/${current.calLink}`;
+    clearTimeout(entry.timer);
+    $('[data-book-loading]', entry.cal).hidden = entry.ready || entry.failed;
+    $('[data-book-error]', entry.cal).hidden = !entry.failed;
+    if (entry.failed) $('[data-book-error-link]', entry.cal).href = `https://cal.com/${entry.service.calLink}`;
     // Не завантажився за 20 с (немає мережі, блокувальник) — посилання на сторінку запису Cal.com
-    if (entry && !entry.ready && !entry.failed) loadTimer = setTimeout(() => { entry.failed = true; if (current && embeds.get(current.id) === entry) showStatus(entry); }, 20000);
+    if (!entry.ready && !entry.failed) entry.timer = setTimeout(() => { entry.failed = true; showStatus(entry); }, 20000);
   }
 
   // Банер cookies (fixed унизу) лежав би над календарем і перехоплював натискання — напр. кнопку «Підтвердити» на телефоні
@@ -205,7 +270,7 @@
   // банер з'явиться на наступній сторінці, або його відкриває «Налаштування cookies» у футері.
   const consent = document.querySelector('[data-consent]');
   let consentByUser = false;
-  const calendarOpen = () => !!(current && current.calLink && !step2.hidden && done.hidden);
+  const calendarOpen = () => !step2.hidden && [...embeds.entries()].some(([id, x]) => picked.has(id) && !x.booked);
   function keepConsentAway() {
     if (consent && !consent.hidden && !consentByUser && calendarOpen()) { consent.hidden = true; dbg('банер cookies сховано, щоб не закривав календар'); }
   }
@@ -214,122 +279,153 @@
     document.addEventListener('click', (e) => { if (e.target.closest('[data-consent-open]')) consentByUser = true; }, true);
   }
 
-  function openCalendar(service) {
-    let entry = embeds.get(service.id);
-    if (!entry) {
-      // Простір імен — новий для кожного календаря (після запису послугу можна обрати знову — буде новий календар)
-      const ns = `wr_${service.id.replace(/[^a-z0-9]/gi, '_')}_${++nsCount}`;
-      const box = document.createElement('div');
-      box.className = 'book-cal-embed';
-      box.id = `book-cal-${ns}`;
-      box.dataset.calNs = ns;
-      cal.appendChild(box);
-      entry = { box, ready: false, failed: false, booked: false };
-      embeds.set(service.id, entry);
-      const Cal = calApi();
-      // Скрипт не завантажився (немає мережі чи його заблоковано)
-      const script = document.querySelector(`script[src="${CAL_SCRIPT}"]`);
-      if (script && !script.dataset.wrWatch) {
-        script.dataset.wrWatch = '1';
-        script.addEventListener('error', () => { embeds.forEach((x) => { if (!x.ready) x.failed = true; }); if (current && current.calLink) showStatus(embeds.get(current.id)); });
-      }
-      Cal('init', ns, { origin: CAL_ORIGIN });
-      const api = Cal.ns[ns];
-      // Опис події сховано (hideEventTypeDetails), але вибір тривалості (1–4 год) і часовий пояс лишаються видимими
-      api('inline', {
-        elementOrSelector: `#${box.id}`, calLink: service.calLink,
-        config: { layout: 'month_view', theme: 'dark', showEventDurationWhenEventDetailsHidden: 'true', showTimezoneWhenEventDetailsHidden: 'true' },
-      });
-      api('ui', calTheme());
-      const ready = () => { entry.ready = true; entry.failed = false; if (current === service) showStatus(entry); refreshLayout(); };
-      api('on', { action: 'linkReady', callback: ready });
-      api('on', { action: 'linkFailed', callback: () => { entry.failed = true; if (current === service) showStatus(entry); } });
-      if (DEBUG) {
-        // «*» — усі події цього календаря (формат: window CustomEvent `CAL:<ns>:<type>`, detail = { type, namespace, fullType, data })
-        api('on', { action: '*', callback: (e) => dbg(`${ns} подія`, e.detail && e.detail.type, e.detail && e.detail.data) });
-        if ('ResizeObserver' in window) {
-          let last = 0;
-          new ResizeObserver(() => {
-            const f = box.querySelector('iframe');
-            const h = f ? Math.round(f.getBoundingClientRect().height) : 0;
-            if (h !== last) { dbg(`${ns} висота iframe: ${last} → ${h}px`); last = h; }
-          }).observe(box);
-        }
-      }
-      api('on', { action: 'bookingSuccessfulV2', callback: (e) => onBooked(service, entry, e) });
-      api('on', { action: 'bookingSuccessful', callback: (e) => onBooked(service, entry, e) });
+  function createCalendar(service) {
+    // Простір імен — новий для кожного календаря
+    const ns = `wr_${service.id.replace(/[^a-z0-9]/gi, '_')}_${++nsCount}`;
+    const sec = calTpl.content.firstElementChild.cloneNode(true);
+    const calEl = $('[data-book-cal]', sec);
+    const box = document.createElement('div');
+    box.className = 'book-cal-embed';
+    box.id = `book-cal-${ns}`;
+    box.dataset.calNs = ns;
+    calEl.appendChild(box);
+    $('[data-cal-title]', sec).textContent = (T.calendar_for || '{service}').replace('{service}', service.name);
+    const entry = { service, sec, cal: calEl, box, ready: false, failed: false, booked: false, booking: null, done: null, timer: 0 };
+    embeds.set(service.id, entry);
+    placeSections();
+    const Cal = calApi();
+    // Скрипт не завантажився (немає мережі чи його заблоковано)
+    const script = document.querySelector(`script[src="${CAL_SCRIPT}"]`);
+    if (script && !script.dataset.wrWatch) {
+      script.dataset.wrWatch = '1';
+      script.addEventListener('error', () => { embeds.forEach((x) => { if (!x.ready && !x.booked) { x.failed = true; showStatus(x); } }); });
     }
-    embeds.forEach((x, id) => { x.box.hidden = id !== service.id; });
+    Cal('init', ns, { origin: CAL_ORIGIN });
+    const api = Cal.ns[ns];
+    // Опис події сховано (hideEventTypeDetails), але вибір тривалості й часовий пояс лишаються видимими
+    api('inline', {
+      elementOrSelector: `#${box.id}`, calLink: service.calLink,
+      config: { layout: 'month_view', theme: 'dark', showEventDurationWhenEventDetailsHidden: 'true', showTimezoneWhenEventDetailsHidden: 'true' },
+    });
+    api('ui', calTheme());
+    api('on', { action: 'linkReady', callback: () => { entry.ready = true; entry.failed = false; showStatus(entry); refreshLayout(); } });
+    api('on', { action: 'linkFailed', callback: () => { entry.failed = true; showStatus(entry); } });
+    if (DEBUG) {
+      // «*» — усі події цього календаря (формат: window CustomEvent `CAL:<ns>:<type>`, detail = { type, namespace, fullType, data })
+      api('on', { action: '*', callback: (e) => dbg(`${ns} подія`, e.detail && e.detail.type, e.detail && e.detail.data) });
+      if ('ResizeObserver' in window) {
+        let last = 0;
+        new ResizeObserver(() => {
+          const f = box.querySelector('iframe');
+          const h = f ? Math.round(f.getBoundingClientRect().height) : 0;
+          if (h !== last) { dbg(`${ns} висота iframe: ${last} → ${h}px`); last = h; }
+        }).observe(box);
+      }
+    }
+    api('on', { action: 'bookingSuccessfulV2', callback: (e) => onBooked(service, entry, e) });
+    api('on', { action: 'bookingSuccessful', callback: (e) => onBooked(service, entry, e) });
     showStatus(entry);
+    return entry;
   }
 
-  /* ---------- Вибір послуги ---------- */
-  // Висота сторінки змінилась (з'явився крок 2, календар підріс) — перерахувати анімації на скролі
-  let refreshQueued = 0;
-  function refreshLayout() {
-    cancelAnimationFrame(refreshQueued);
-    refreshQueued = requestAnimationFrame(() => window.wrMotion?.ScrollTrigger?.refresh());
-  }
-  if ('ResizeObserver' in window) new ResizeObserver(refreshLayout).observe(step2);
-
-  function scrollToEl(el) {
-    const lenis = window.wrMotion?.lenis;
-    if (lenis && !reduce) lenis.scrollTo(el, { duration: 1 });
-    else el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  // Секції календарів — у порядку послуг; видно лише обрані
+  function placeSections() {
+    order.forEach((id) => {
+      const x = embeds.get(id);
+      if (!x) return;
+      x.sec.hidden = !picked.has(id);
+      calsBox.appendChild(x.sec);
+    });
+    // Заголовок «Дата й час: …» потрібен, лише коли календарів кілька
+    const shown = [...embeds.values()].filter((x) => !x.sec.hidden);
+    shown.forEach((x) => { $('[data-cal-title]', x.sec).hidden = !!x.done || shown.length < 2; });
   }
 
-  function reveal() {
-    if (!step2.hidden) return;
-    step2.hidden = false;
-    if (step2.animate) {
-      step2.animate(reduce
-        ? [{ opacity: 0 }, { opacity: 1 }]
-        : [{ opacity: 0, transform: 'translateY(28px)' }, { opacity: 1, transform: 'none' }],
-      { duration: reduce ? 300 : 700, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+  /* ---------- Крок 2: обрані послуги ---------- */
+  const remoteText = $('[data-remote-text]', remote);
+  const remoteList = $('[data-remote-list]', remote);
+
+  function render() {
+    const ids = order.filter((id) => picked.has(id));
+    $$('[data-chosen]', step2).forEach((li) => { li.hidden = !picked.has(li.dataset.chosen); });
+    boxes.forEach((b) => { b.checked = picked.has(b.value); });
+    pickerSummary();
+    placeSections();
+    const rem = ids.map((id) => byId.get(id)).filter((s) => !s.calLink);
+    remote.hidden = !rem.length;
+    remoteText.textContent = (rem.length > 1 && T.remote_many) || T.remote_one || '';
+    remoteList.replaceChildren(...(rem.length > 1 ? rem.map((s) => Object.assign(document.createElement('li'), { textContent: s.name })) : []));
+    title2.textContent = ids.some((id) => byId.get(id).calLink) ? T.step_time : T.step_remote || T.step_time;
+    // Нічого не обрано — крок 2 ховається
+    if (!ids.length) step2.hidden = true;
+    else if (step2.hidden) {
+      step2.hidden = false;
+      appear(step2, 28, 700);
     }
-    refreshLayout();
-  }
-
-  function select(id, { source = 'click', scroll = true } = {}) {
-    const service = byId.get(id);
-    if (!service) return;
-    const same = current === service;
-    current = service;
-    hideDone();
-    cards.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.bookService === id)));
-    els.name.textContent = service.name;
-    els.meta.textContent = [service.duration, service.price].filter(Boolean).join(' · ');
-    els.stub.hidden = !!service.calLink;
-    if (service.calLink) openCalendar(service);
-    else { embeds.forEach((x) => { x.box.hidden = true; }); showStatus(null); }
-    reveal();
     keepConsentAway();
-    // Адреса з обраною послугою — щоб можна було поділитися чи оновити сторінку
+    refreshLayout();
+    // Адреса з обраними послугами — щоб можна було поділитися чи оновити сторінку
     try {
       const url = new URL(location.href);
-      url.searchParams.set('service', id);
+      if (ids.length) url.searchParams.set('service', ids.join(',')); else url.searchParams.delete('service');
       history.replaceState(history.state, '', url);
     } catch { /* без History API — нічого */ }
-    if (!same) track('booking_service_select', { service: service.name, service_id: service.id, source });
-    if (scroll) {
-      scrollToEl(step2);
-      els.title.focus({ preventScroll: true });
-    }
   }
 
-  cards.forEach((card) => card.addEventListener('click', () => select(card.dataset.bookService)));
-  els.change.addEventListener('click', () => {
-    scrollToEl($('#book-service'));
-    const card = cards.find((c) => c.getAttribute('aria-pressed') === 'true') || cards[0];
-    card?.focus({ preventScroll: true });
+  const packageTaken = () => [...picked].some((x) => byId.get(x).package);
+
+  // Додати послугу; false — не можна (уже обрано інший пакет)
+  function add(id, source) {
+    const service = byId.get(id);
+    if (!service) return false;
+    if (picked.has(id)) return true;
+    if (service.package && packageTaken()) { showAlert(); dbg('другий пакет заблоковано', id); return false; }
+    picked.add(id);
+    let entry = embeds.get(id);
+    // Записаний календар більше не показуємо: повторний вибір послуги відкриває новий
+    if (entry && entry.booked) { entry.sec.remove(); embeds.delete(id); entry = null; }
+    if (service.calLink && !entry) createCalendar(service);
+    render();
+    const sec = embeds.get(id)?.sec;
+    if (sec && !sec.hidden) appear(sec, 16, 500);
+    track('booking_service_select', { service: service.name, service_id: id, source });
+    dbg('обрано', id, [...picked]);
+    return true;
+  }
+
+  function remove(id) {
+    if (!picked.delete(id)) return;
+    render();
+    dbg('прибрано', id, [...picked]);
+  }
+
+  step2.addEventListener('click', (e) => {
+    const x = e.target.closest('[data-unpick]');
+    if (!x) return;
+    remove(x.dataset.unpick);
+    // Фокус — на наступну кнопку «прибрати» або на кнопку списку
+    const next = $$('[data-chosen]:not([hidden]) [data-unpick]', step2)[0];
+    (next || pickBtn).focus({ preventScroll: true });
   });
 
-  // ?service=… в адресі — одразу обрати послугу; прокрутка до календаря — коли сторінка вже з'явилась
-  const pre = new URLSearchParams(location.search).get('service');
-  if (pre && byId.has(pre)) {
-    select(pre, { source: 'url', scroll: false });
+  $('[data-book-change]').addEventListener('click', () => {
+    scrollToEl($('#book-service'), -24);
+    setTimeout(() => openPicker(true), reduce ? 0 : 450);
+  });
+
+  // ?service=a,b в адресі — одразу обрати послуги; прокрутка до кроку 2 — коли сторінка вже з'явилась
+  const pre = (new URLSearchParams(location.search).get('service') || '').split(',').map((s) => s.trim()).filter((id) => byId.has(id));
+  pre.forEach((id) => {
+    const s = byId.get(id);
+    if (picked.has(id) || (s.package && packageTaken())) return;
+    picked.add(id);
+    if (s.calLink) createCalendar(s);
+    track('booking_service_select', { service: s.name, service_id: id, source: 'url' });
+  });
+  render();
+  if (picked.size) {
     Promise.resolve(window.wrMotion?.entered).then(() => setTimeout(() => {
-      if (step2.getBoundingClientRect().top > innerHeight * 0.6) scrollToEl(step2);
+      if (step2.getBoundingClientRect().top > innerHeight * 0.6) scrollToEl(step2, -16);
     }, 500));
   }
 })();

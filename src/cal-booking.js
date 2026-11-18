@@ -26,27 +26,51 @@ export function calLink(value, username = '') {
   return { link: parts.join('/') };
 }
 
+/** id послуги без власного id: «блок-номер» (media-1, business-3…) — для ?service= і чекбоксів у списку. */
+export const serviceId = (s, group, i) => (s && /^[a-z0-9-]+$/i.test(s.id || '') ? String(s.id) : `${group}-${i + 1}`);
+
 /**
  * Перевіряє booking.json і збирає список послуг для сторінки запису.
- * sound — блок sound із services.json. Повертає { services: [{ id, name, price, duration, calLink }], issues: [...] }.
+ * catalog — увесь services.json ({ sound, media, business }) або (як раніше) лише масив блоку sound.
+ * На сторінці запису — усі послуги з усіх блоків (у групах, як на сторінці Послуг). Календар Cal.com — лише в тих,
+ * що є в event_types з заповненим значенням (запис на дату в студії); решта — дистанційні, деталі в Telegram.
+ * packages — id пакетів, з яких можна обрати лише один.
+ * Повертає { services: [{ id, group, name, price, duration, description, calLink, package }], issues: [...] }.
  */
-export function bookingServices(booking, sound = []) {
+export const GROUPS = ['sound', 'media', 'business'];
+export function bookingServices(booking, catalog = {}) {
   const issues = [];
-  if (!booking || typeof booking !== 'object' || Array.isArray(booking)) return { services: [], issues: ['файл має містити об\'єкт з полями cal_username, event_types і texts'] };
+  if (Array.isArray(catalog)) catalog = { sound: catalog };
+  if (!booking || typeof booking !== 'object' || Array.isArray(booking)) return { services: [], issues: ["файл має містити об'єкт з полями cal_username, event_types і texts"] };
   const types = booking.event_types;
-  if (!types || typeof types !== 'object' || Array.isArray(types)) return { services: [], issues: ['поле «event_types» має бути об\'єктом { "id послуги": "тип запису Cal.com" }'] };
+  if (!types || typeof types !== 'object' || Array.isArray(types)) return { services: [], issues: [`поле «event_types» має бути об'єктом { "id послуги": "тип запису Cal.com" }`] };
   const user = String(booking.cal_username || '').trim();
   if (user && !SLUG.test(user.replace(/^@/, ''))) issues.push(`cal_username «${user}» — лише латинські літери, цифри, крапка, дефіс і підкреслення`);
-  const byId = new Map(sound.filter((s) => s && s.id).map((s) => [String(s.id), s]));
+  const packages = booking.packages === undefined ? [] : booking.packages;
+  if (!Array.isArray(packages)) issues.push('поле «packages» має бути списком id послуг-пакетів');
   const services = [];
+  for (const group of GROUPS) {
+    (Array.isArray(catalog[group]) ? catalog[group] : []).forEach((s, i) => {
+      if (!s || !s.name) return;
+      const id = serviceId(s, group, i);
+      if (services.some((x) => x.id === id)) { issues.push(`services.json: id «${id}» повторюється`); return; }
+      services.push({
+        id, group, name: String(s.name), price: String(s.price || ''), duration: String(s.duration || ''),
+        description: String(s.description || ''), calLink: '', package: Array.isArray(packages) && packages.includes(id),
+      });
+    });
+  }
+  const byId = new Map(services.map((s) => [s.id, s]));
   for (const [id, value] of Object.entries(types)) {
     const s = byId.get(id);
-    if (!s) { issues.push(`event_types: послуги з id «${id}» немає в services.json (блок sound)`); continue; }
-    if (s.button === 'telegram') { issues.push(`event_types: послуга «${s.name}» на сторінці Послуг замовляється через Telegram — приберіть її звідси або поле «button» у services.json`); continue; }
+    if (!s) { issues.push(`event_types: послуги з id «${id}» немає в services.json`); continue; }
+    const src = (catalog[s.group] || []).find((x, i) => serviceId(x, s.group, i) === id);
+    if (src && src.button === 'telegram' && value) { issues.push(`event_types: послуга «${s.name}» на сторінці Послуг замовляється через Telegram — приберіть її звідси або поле «button» у services.json`); continue; }
     const { link, error } = calLink(value, user);
     if (error) { issues.push(`event_types → «${id}»: ${error}`); continue; }
-    services.push({ id, name: String(s.name || ''), price: String(s.price || ''), duration: String(s.duration || ''), calLink: link });
+    s.calLink = link;
   }
-  if (!services.length && !issues.length) issues.push('у «event_types» немає жодної послуги');
+  if (Array.isArray(packages)) for (const id of packages) if (!byId.has(id)) issues.push(`packages: послуги з id «${id}» немає в services.json`);
+  if (!services.length && !issues.length) issues.push('у services.json немає жодної послуги');
   return { services, issues };
 }

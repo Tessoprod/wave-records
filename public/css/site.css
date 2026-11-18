@@ -249,11 +249,11 @@ html.lg-refract .glass:not(.glass-panel):not(.site-header), html.lg-refract .btn
    а та, що під курсором, збільшується (як і раніше). Те саме при фокусі з клавіатури.
    Групи: послуги (головна й сторінка Послуги), Контакти, інформаційні картки Запису, принципи на Про студію, треки, питання FAQ.
    opacity з !important — після появи на скролі motion.js лишає вбудоване opacity: 1. */
-:is(.svc-grid, .svc-full-grid, .bento, .book-info, .book-svc-grid, .book-how, .phil-grid, .tracks, .faq-list) > * { transition: filter .3s var(--ease), opacity .3s var(--ease), transform .38s var(--ease-spring), box-shadow .38s var(--ease); }
+:is(.svc-grid, .svc-full-grid, .bento, .book-info, .book-how, .phil-grid, .tracks, .faq-list) > * { transition: filter .3s var(--ease), opacity .3s var(--ease), transform .38s var(--ease-spring), box-shadow .38s var(--ease); }
 @media (hover: hover) and (pointer: fine) {
-  :is(.svc-grid, .svc-full-grid, .bento, .book-info, .book-svc-grid, .book-how, .phil-grid, .tracks, .faq-list):has(> :hover) > :not(:hover) { filter: blur(2.5px); opacity: .5 !important; }
+  :is(.svc-grid, .svc-full-grid, .bento, .book-info, .book-how, .phil-grid, .tracks, .faq-list):has(> :hover) > :not(:hover) { filter: blur(2.5px); opacity: .5 !important; }
 }
-:is(.svc-grid, .svc-full-grid, .bento, .book-info, .book-svc-grid, .book-how, .phil-grid, .tracks, .faq-list):has(:focus-visible) > :not(:focus-within) { filter: blur(2.5px); opacity: .5 !important; }
+:is(.svc-grid, .svc-full-grid, .bento, .book-info, .book-how, .phil-grid, .tracks, .faq-list):has(:focus-visible) > :not(:focus-within) { filter: blur(2.5px); opacity: .5 !important; }
 
 /* ---------- Кнопки ---------- */
 
@@ -630,6 +630,9 @@ html.wr-anim [data-hero-intro]:not(.is-in) ~ .scroll-hint { opacity: 0; }
 html.js [data-hero-intro].is-in ~ .scroll-hint { transition-delay: .9s, 0s; }
 [data-hero-intro] ~ .scroll-hint.is-hidden { opacity: 0; pointer-events: none; transition-delay: 0s; }
 .hero-bottom { display: flex; flex-direction: column; align-items: center; gap: 28px; margin-top: clamp(28px, 4vw, 48px); }
+/* Заголовок і кнопки згасають, рухаючись разом із прокруткою (heroFadeTweens у motion.js) — окремі шари, щоб браузер
+   лише зсував готову картинку, а не перемальовував великий текст із тінню на кожному кадрі */
+.hero-title, .hero-bottom { will-change: transform, opacity; }
 .hero-sub { font-size: clamp(18px, 1.7vw, 23px); color: var(--ink-2); max-width: 26em; line-height: 1.45; text-wrap: balance; }
 .hero-ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 
@@ -972,32 +975,82 @@ html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 .book-step-title { font-family: var(--font-display); font-weight: 900; font-synthesis: none; text-transform: uppercase; letter-spacing: -.012em; font-size: clamp(24px, 2.6vw, 36px); line-height: 1.05; }
 .book-step-title:focus { outline: none; }
 
-/* Крок 1: картки послуг (кнопки з aria-pressed) */
-.book-svc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.book-svc-grid > li { display: flex; }
-.book-svc {
-  width: 100%; min-height: 176px; padding: 24px;
-  display: flex; flex-direction: column; gap: 18px;
-  text-align: left; color: inherit; cursor: pointer;
+/* Крок 1: випадний список послуг (кнопка + панель із чекбоксами; логіка — book-cal.js) */
+.book-picker { position: relative; max-width: 780px; }
+.book-picker-btn {
+  width: 100%; min-height: 64px; padding: 12px 16px 12px 24px; border-radius: var(--r-lg);
+  display: flex; align-items: center; gap: 14px; text-align: left; color: var(--ink-2); font-size: 17px; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.book-svc-name { font-family: var(--font-display); font-weight: 900; font-synthesis: none; text-transform: uppercase; letter-spacing: -.012em; font-size: clamp(18px, 1.5vw, 22px); line-height: 1.08; padding-right: 30px; overflow-wrap: break-word; }
-.book-svc-meta { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
-.book-svc-dur { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-2); font-size: 14px; font-weight: 500; }
-.book-svc-dur .i { width: 16px; height: 16px; color: var(--ink-3); }
-.book-svc-price { font-size: clamp(19px, 1.7vw, 24px); font-weight: 700; letter-spacing: -.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
-.book-svc-mark { position: absolute; top: 20px; right: 20px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line-2); transition: background-color .25s, border-color .25s, box-shadow .3s; }
-.book-svc-mark::after { content: ''; position: absolute; left: 6.5px; top: 3px; width: 5px; height: 10px; border: solid var(--black); border-width: 0 2px 2px 0; transform: rotate(45deg) scale(.4); opacity: 0; transition: transform .35s var(--ease-spring), opacity .2s; }
-.book-svc[aria-pressed="true"] { border-color: rgba(var(--pink-rgb), .6); box-shadow: inset 0 0 0 1px rgba(var(--pink-rgb), .25), 0 18px 50px -22px rgba(var(--pink-rgb), .35), var(--glass-shadow); }
-.book-svc[aria-pressed="true"] .book-svc-mark { border-color: var(--pink); background: var(--pink); box-shadow: 0 0 14px rgba(var(--pink-rgb), .35); }
-.book-svc[aria-pressed="true"] .book-svc-mark::after { opacity: 1; transform: rotate(45deg) scale(1); }
+.book-picker.has-value .book-picker-btn { color: var(--white); font-weight: 600; }
+.book-picker.is-open .book-picker-btn { border-color: rgba(var(--pink-rgb), .5); }
+.book-picker-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.book-picker-count { flex: none; padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(var(--pink-rgb), .45); color: var(--pink); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.book-picker-chev { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line); }
+.book-picker-chev .i { width: 18px; height: 18px; transform: rotate(90deg); transition: transform .4s var(--ease-spring); }
+.book-picker.is-open .book-picker-chev .i { transform: rotate(-90deg); }
+/* Панель вилітає під кнопкою поверх сторінки; темніша за звичайне скло, щоб текст під нею не заважав читати */
+.book-picker-panel {
+  position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 10px);
+  display: flex; flex-direction: column; max-height: min(66vh, 640px); padding: 0; border-radius: var(--r-lg);
+  background-color: rgba(17, 17, 17, .86); transform-origin: 50% 0;
+}
+.book-picker-scroll { overflow-y: auto; overscroll-behavior: contain; padding: 6px 10px 10px; scrollbar-width: thin; }
+.book-picker-group { border: 0; margin: 0; padding: 12px 0 0; min-width: 0; }
+.book-picker-legend { padding: 4px 14px 6px; font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--pink); }
+.book-opt { position: relative; display: flex; gap: 14px; padding: 14px; border-radius: var(--r-md); cursor: pointer; transition: background-color .2s; -webkit-tap-highlight-color: transparent; }
+.book-opt:has(:checked) { background-color: rgba(var(--pink-rgb), .08); }
+.book-opt:has(:focus-visible) { outline: 2px solid var(--cyan); outline-offset: -2px; }
+.book-opt-input { position: absolute; left: 14px; top: 16px; width: 22px; height: 22px; margin: 0; opacity: 0; }
+.book-opt-box { flex: none; position: relative; width: 22px; height: 22px; margin-top: 1px; border-radius: 7px; border: 1.5px solid var(--line-2); transition: background-color .25s, border-color .25s, box-shadow .3s; }
+.book-opt-box::after { content: ''; position: absolute; left: 6.5px; top: 2.5px; width: 5px; height: 10px; border: solid var(--black); border-width: 0 2px 2px 0; transform: rotate(45deg) scale(.4); opacity: 0; transition: transform .35s var(--ease-spring), opacity .2s; }
+.book-opt-input:checked + .book-opt-box { background-color: var(--pink); border-color: var(--pink); box-shadow: 0 0 14px rgba(var(--pink-rgb), .35); }
+.book-opt-input:checked + .book-opt-box::after { opacity: 1; transform: rotate(45deg) scale(1); }
+.book-opt-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.book-opt-top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 2px 16px; }
+.book-opt-name { font-size: 17px; font-weight: 700; line-height: 1.3; }
+.book-opt-price { font-size: 15px; font-weight: 700; color: var(--white); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.book-opt-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 13px; color: var(--ink-3); }
+.book-opt-tag { padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line-2); }
+.book-opt-tag.is-studio { border-color: rgba(var(--pink-rgb), .45); color: var(--pink); }
+.book-opt-dur { display: inline-flex; align-items: center; gap: 6px; }
+.book-opt-dur .i { width: 14px; height: 14px; }
+.book-opt-desc { font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.book-picker-foot { flex: none; display: flex; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--line); }
+@media (hover: hover) and (pointer: fine) {
+  .book-picker-btn:hover .book-picker-chev { border-color: rgba(var(--pink-rgb), .45); }
+  .book-opt:hover { background-color: rgba(245, 245, 245, .05); }
+  .book-opt:has(:checked):hover { background-color: rgba(var(--pink-rgb), .12); }
+}
+/* Сповіщення «Можна обрати лише один пакет…» — знизу по центру екрана (центрування властивістю translate,
+   бо transform анімує book-cal.js) */
+.book-picker-alert {
+  position: fixed; z-index: 70; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); translate: -50% 0;
+  width: max-content; max-width: calc(100vw - 2 * var(--gutter)); padding: 14px 22px; border-radius: var(--r-lg);
+  border-color: rgba(var(--pink-rgb), .55); background-color: rgba(17, 17, 17, .88);
+  font-size: 16px; font-weight: 600; text-align: center; box-shadow: 0 0 30px -6px rgba(var(--pink-rgb), .35), var(--glass-shadow);
+}
 
-/* Крок 2: обрана послуга і календар */
-.book-chosen { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px 24px; padding: 18px 18px 18px 26px; border-radius: var(--r-lg); margin-bottom: 14px; }
+/* Крок 2: обрані послуги, календарі й дистанційні послуги */
+.book-chosen { padding: 18px 18px 6px 26px; border-radius: var(--r-lg); margin-bottom: 14px; }
+.book-chosen-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 8px; }
 .book-chosen-label { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
-.book-chosen-name { font-size: clamp(19px, 1.6vw, 22px); font-weight: 700; line-height: 1.25; margin-top: 4px; }
+.book-chosen-item { display: flex; align-items: flex-start; gap: 16px; padding: 16px 0; border-top: 1px solid var(--line); }
+.book-chosen-text { flex: 1; min-width: 0; }
+.book-chosen-name { font-size: clamp(18px, 1.5vw, 21px); font-weight: 700; line-height: 1.25; }
 .book-chosen-meta { color: var(--ink-2); font-size: 15px; margin-top: 2px; }
+.book-chosen-desc { color: var(--ink-2); font-size: 15px; line-height: 1.5; margin-top: 8px; max-width: 62em; }
+.book-chosen-x { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line); background: none; color: var(--ink-2); cursor: pointer; transition: color .2s, border-color .2s; }
+.book-chosen-x .i { width: 18px; height: 18px; }
+@media (hover: hover) and (pointer: fine) { .book-chosen-x:hover { color: var(--white); border-color: rgba(var(--pink-rgb), .5); } }
 .book-change { flex: none; }
+.book-cals { display: flex; flex-direction: column; gap: 22px; }
+.book-cal-title { font-size: clamp(17px, 1.4vw, 20px); font-weight: 700; margin: 6px 0 12px 4px; }
+.book-remote { margin-top: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 18px; padding: clamp(24px, 3vw, 36px); }
+.book-cals:has(> :not([hidden])) ~ .book-remote { margin-top: 22px; }
+.book-remote-text { font-size: clamp(17px, 1.5vw, 20px); line-height: 1.45; max-width: 36em; text-wrap: pretty; }
+.book-remote-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.book-remote-list li { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 14px; color: var(--ink-2); }
 /* Над календарем Cal.com (сторонній iframe) — нічого: без обрізання, розмиття фону, рухомого відблиску й рамки-підсвітки;
    висоту iframe задає сам Cal.com за своїми повідомленнями — тут лише ширина, без фіксованої висоти */
 .book-cal { padding: clamp(8px, 1.4vw, 18px); min-height: 220px; overflow: visible; isolation: auto; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -1014,8 +1067,6 @@ html.stage-on .hero-inner :is(a, button) { pointer-events: auto; }
 @keyframes book-eq { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
 .book-cal-error { padding: clamp(28px, 4vw, 48px) 20px; text-align: center; color: var(--ink-2); }
 .book-cal-error .text-link { display: inline-flex; }
-.book-stub { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 24px; padding: clamp(40px, 6vw, 76px) 20px; }
-.book-stub-text { font-size: clamp(17px, 1.5vw, 20px); color: var(--ink-2); max-width: 30em; text-wrap: balance; }
 .book-note { margin-top: 16px; color: var(--ink-3); font-size: 15px; max-width: 52em; }
 
 /* Екран успіху після запису (замість підтвердження Cal.com) */
@@ -1179,11 +1230,11 @@ body:has(.mini-player:not([hidden])) .site-footer { padding-bottom: calc(110px +
    Список тут має збігатися з тим, що проявляє motion.js. */
 
 html.wr-anim main :is(.h1, .h2, .page-lead, .sec-lead, .sec-sub, .chapter):not(dialog *),
-html.wr-anim :is(.svc-grid, .svc-full-grid, .phil-grid, .why-grid, .bento, .book-info, .book-svc-grid, .book-how, .gallery, .tracks, .chips, .faq-list) > *,
+html.wr-anim :is(.svc-grid, .svc-full-grid, .phil-grid, .why-grid, .bento, .book-info, .book-how, .gallery, .tracks, .chips, .faq-list) > *,
 html.wr-anim :is(.cta-band, .tl-text, .empty-state) { opacity: 0; }
 /* Решта вмісту без власної анімації — проявляється слідом за назвою сторінки (plainFade у motion.js) */
 html.wr-anim :is(main .prose, .legal .muted, .error-page .hero-ctas, .about-hero-photo, .final-cta, .sec-head > .btn,
-  .section-steps .steps, .steps-cta, .marquee, .book-help, .book-pick > .book-step-head, .faq-nav, .faq-group-title, .faq-help, .faq-home-ctas, .site-footer) { opacity: 0; }
+  .section-steps .steps, .steps-cta, .marquee, .book-help, .book-pick > .book-step-head, .book-picker, .faq-nav, .faq-group-title, .faq-help, .faq-home-ctas, .site-footer) { opacity: 0; }
 html.wr-anim .tl-media { clip-path: inset(100% 0 0 0); }
 html.wr-anim .tl-num { opacity: 0; }
 html.wr-anim .steps { --steps-p: 0; }
@@ -1596,16 +1647,14 @@ html.from-menu::view-transition-group(vt-curtain) { display: none; }
   .track-wave { height: 40px; }
 }
 
-/* Запис (Cal.com) на телефоні: послуги — сітка у дві колонки, календар на всю ширину без внутрішніх відступів */
+/* Запис (Cal.com) на телефоні: список послуг на всю ширину, календар на всю ширину без внутрішніх відступів */
 @media (max-width: 860px) {
-  .book-svc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .book-svc { min-height: 150px; padding: 18px 16px; gap: 14px; }
-  /* Назва — на всю ширину картки (довгі слова на кшталт «аранжування» не розриваються), позначка вибору — унизу праворуч */
-  .book-svc-name { font-size: 15px; padding-right: 0; overflow-wrap: normal; hyphens: manual; }
-  .book-svc-mark { top: auto; bottom: 18px; right: 14px; width: 20px; height: 20px; }
-  .book-svc-mark::after { left: 5.5px; top: 2px; }
-  .book-svc-price { font-size: 17px; padding-right: 26px; }
-  .book-chosen { padding: 16px 16px 16px 20px; }
+  .book-picker-btn { min-height: 58px; padding: 10px 12px 10px 18px; font-size: 16px; }
+  .book-picker-panel { max-height: min(72svh, 640px); }
+  .book-picker-scroll { padding: 4px 6px 8px; }
+  .book-opt { padding: 12px 10px; gap: 12px; }
+  .book-opt-input { left: 10px; top: 14px; }
+  .book-chosen { padding: 16px 14px 4px 18px; }
   .book-cal { padding: 0; border-radius: var(--r-lg); }
   .book-cal-embed iframe { border-radius: var(--r-lg); }
   .book-contacts { grid-template-columns: 1fr; }
@@ -1616,14 +1665,12 @@ html.from-menu::view-transition-group(vt-curtain) { display: none; }
   .book-how-item { min-height: 0; }
   .book-how-item .num { padding-bottom: 8px; }
   .book-chosen .book-change { width: 100%; }
+  .book-picker-foot .btn, .book-remote .btn { width: 100%; justify-content: center; }
+  .book-opt-name { font-size: 16px; }
   .book-done-list > div { grid-template-columns: 1fr; gap: 4px; padding: 13px 2px; }
   .book-done-list dt { font-size: 13px; padding-top: 0; }
   .book-done-actions, .book-done > .btn-neon { width: 100%; }
   .book-done-actions .btn, .book-done > .btn-neon { flex: 1 1 100%; width: 100%; justify-content: center; }
-}
-@media (max-width: 370px) {
-  .book-svc { padding: 16px 14px; }
-  .book-svc-name { font-size: 14px; }
 }
 
 /* Телефони й сенсорні екрани: без синьої підсвітки дотику; контур фокусу — лише при навігації з клавіатури
@@ -1638,7 +1685,7 @@ html.from-menu::view-transition-group(vt-curtain) { display: none; }
   html.js:not(.kbd-nav) .menu-links:has(a:focus-visible) a:not(:focus-visible) { opacity: 1; }
   html.js:not(.kbd-nav) .menu-links a:focus-visible { transform: none; }
   html.js:not(.kbd-nav) .menu-links a:focus-visible .menu-line { clip-path: inset(-4px 100% -4px 0); }
-  html.js:not(.kbd-nav) :is(.svc-grid, .svc-full-grid, .bento, .book-info, .book-svc-grid, .book-how, .phil-grid, .tracks, .faq-list):has(:focus-visible) > :not(:focus-within) { filter: none; opacity: 1 !important; }
+  html.js:not(.kbd-nav) :is(.svc-grid, .svc-full-grid, .bento, .book-info, .book-how, .phil-grid, .tracks, .faq-list):has(:focus-visible) > :not(:focus-within) { filter: none; opacity: 1 !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
